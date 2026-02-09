@@ -1,0 +1,135 @@
+.scanner-content {
+    --background: #0f172a;
+}
+
+.scanner-idle {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: 20px;
+}
+
+.demo-badge {
+    text-align: center;
+    padding: 12px 16px;
+    background: rgba(245, 158, 11, 0.1);
+    border-radius: 8px;
+    margin-bottom: 20px;
+    font-size: 14px;
+    font-weight: 500;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.scanner-instructions {
+    text-align: center;
+    margin: 40px 0;
+}
+
+.scanner-instructions h2 {
+    color: #06b6d4;
+    font-size: 28px;
+    margin-bottom: 16px;
+}
+
+.scanner-instructions p {
+    color: #94a3b8;
+    font-size: 16px;
+    margin-bottom: 32px;
+    line-height: 1.5;
+}
+
+.scan-button {
+    --background: linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%);
+    --border-radius: 12px;
+    height: 56px;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.scanner-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+
+.scan-region {
+    position: relative;
+    width: 280px;
+    height: 280px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.scan-frame {
+    width: 100%;
+    height: 100%;
+    border: 3px solid #06b6d4;
+    border-radius: 12px;
+    box-shadow: 0 0 20px rgba(6, 182, 212, 0.5);
+    animation: pulse 2s infinite;
+}
+
+.scan-region p {
+    color: white;
+    margin-top: 20px;
+    font-size: 16px;
+}
+
+.cancel-scan {
+    position: absolute;
+    bottom: 60px;
+}
+
+@keyframes pulse {
+    0%,
+    100% {
+        box-shadow: 0 0 20px rgba(6, 182, 212, 0.5);
+    }
+    50% {
+        box-shadow: 0 0 40px rgba(6, 182, 212, 0.8);
+    }
+}
+
+body.scanner-active {
+    background: transparent !important;
+    --background: transparent !important;
+}
+
+body.scanner-active ion-app {
+    background: transparent !important;
+}
+
+.modal-content {
+    --background: #0f172a;
+}
+
+.product-price {
+    font-size: 36px;
+    font-weight: bold;
+    color: #06b6d4;
+    text-align: center;
+    margin: 20px 0;
+}
+
+.action-buttons {
+    padding: 20px;
+    display: flex;
+    gap: 12px;
+}
+
+.cancel-button,
+.confirm-button {
+    --border-radius: 12px;
+    height: 48px;
+    font-weight: 600;
+}

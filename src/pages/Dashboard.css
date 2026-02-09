@@ -1,0 +1,75 @@
+.dashboard-content {
+    --background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
+}
+
+.safe-to-spend-card {
+    background: linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%);
+    color: white;
+    margin: 16px;
+}
+
+.safe-to-spend-card ion-card-title {
+    color: white;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.safe-amount {
+    text-align: center;
+    margin: 20px 0;
+}
+
+.safe-amount h1 {
+    font-size: 48px;
+    font-weight: bold;
+    margin: 0;
+    color: white;
+}
+
+.safe-amount p {
+    font-size: 16px;
+    margin: 4px 0;
+    opacity: 0.9;
+}
+
+.budget-stats {
+    display: flex;
+    justify-content: space-around;
+    margin-top: 16px;
+}
+
+.budget-stats div {
+    text-align: center;
+}
+
+.budget-stats small {
+    display: block;
+    font-size: 12px;
+    opacity: 0.8;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.budget-stats p {
+    font-size: 18px;
+    font-weight: bold;
+    margin: 4px 0 0 0;
+}
+
+.no-transactions {
+    text-align: center;
+    padding: 20px;
+    color: #64748b;
+    font-style: italic;
+}
+
+ion-card {
+    margin: 16px;
+    border-radius: 12px;
+}
+
+ion-card-title {
+    font-size: 18px;
+    font-weight: 600;
+}
