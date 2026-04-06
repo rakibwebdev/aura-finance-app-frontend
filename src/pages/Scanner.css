@@ -2,10 +2,26 @@
     --background: #0f172a;
 }
 
+body.scanner-active {
+    background: transparent !important;
+}
+
+body.scanner-active ion-content {
+    --background: transparent !important;
+}
+
+ion-content.scanner-active {
+    --background: transparent !important;
+}
+
+body.scanner-active .scanner-idle,
+body.scanner-active ion-header {
+    display: none !important;
+}
+
 .scanner-idle {
     display: flex;
     flex-direction: column;
-    height: 100%;
     padding: 20px;
 }
 

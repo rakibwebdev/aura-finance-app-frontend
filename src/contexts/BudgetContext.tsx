@@ -13,36 +13,38 @@ import {
     ImpactFactor,
     OpportunityCost,
 } from "../types";
+import { useAuth } from "./AuthContext";
+import axios from "axios";
 
 interface BudgetContextType {
     budget: Budget;
     transactions: Transaction[];
     goal: Goal | null;
-    addTransaction: (transaction: Omit<Transaction, "id" | "date">) => void;
+    addTransaction: (
+        transaction: Omit<Transaction, "id" | "date">,
+    ) => Promise<void>;
     calculateImpactFactor: (amount: number) => ImpactFactor;
     calculateOpportunityCost: (productPrice: number) => OpportunityCost;
     setGoal: (goal: Goal) => void;
     updateGoalProgress: (amount: number) => void;
+    updateCategoryBudget: (categoryId: string, amount: number) => Promise<void>;
+    addCategory: (
+        name: string,
+        budgetLimit: number,
+        color?: string,
+    ) => Promise<void>;
 }
 
 const BudgetContext = createContext<BudgetContextType | undefined>(undefined);
 
 const defaultCategories: CategoryBudget[] = [
-    { id: "1", name: "Groceries", allocated: 200, spent: 0, color: "#3b82f6" },
-    { id: "2", name: "Tech", allocated: 150, spent: 0, color: "#8b5cf6" },
-    {
-        id: "3",
-        name: "Entertainment",
-        allocated: 100,
-        spent: 0,
-        color: "#ec4899",
-    },
-    { id: "4", name: "Other", allocated: 50, spent: 0, color: "#f59e0b" },
+    { id: "1", name: "", allocated: 0, spent: 0, color: "#3b82f6" },
 ];
 
 export const BudgetProvider: React.FC<{ children: ReactNode }> = ({
     children,
 }) => {
+    const { user } = useAuth();
     const [budget, setBudget] = useState<Budget>({
         id: "1",
         weeklyBudget: 500,
@@ -53,15 +55,99 @@ export const BudgetProvider: React.FC<{ children: ReactNode }> = ({
 
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [goal, setGoalState] = useState<Goal | null>({
-        id: "1",
+        id: "goal_1",
         name: "Tesla Cybertruck",
-        targetAmount: 60000,
-        currentAmount: 0,
-        modelType: "3d-object",
-        progressStage: "wireframe",
+        modelName: "Tesla_Model_3",
+        targetAmount: 45000,
+        savedAmount: 13500,
+        currency: "£",
     });
 
-    // Load from local storage
+    // Fetch categories from API when user is authenticated
+    useEffect(() => {
+        if (!user?.id) return;
+
+        const fetchCategories = async () => {
+            try {
+                const response = await axios.get(
+                    `${import.meta.env.VITE_API_URL}/api/categories/user/${
+                        user.id
+                    }`,
+                );
+
+                const apiCategories = response.data;
+
+                const categories: CategoryBudget[] = apiCategories.map(
+                    (cat: any) => ({
+                        id: cat._id,
+                        name: cat.name,
+                        allocated: cat.budgetLimit,
+                        spent: cat.spent,
+                        color: cat.color || "#6366f1",
+                    }),
+                );
+
+                // Update budget with fetched categories
+                setBudget((prevBudget) => ({
+                    ...prevBudget,
+                    categories:
+                        categories.length > 0 ? categories : defaultCategories,
+                }));
+            } catch (error) {
+                console.error("Error fetching categories:", error);
+            }
+        };
+
+        fetchCategories();
+    }, [user?.id]);
+
+    // Fetch transactions from API when user is authenticated
+    useEffect(() => {
+        if (!user?.id) return;
+
+        const fetchTransactions = async () => {
+            try {
+                const response = await axios.get(
+                    `${import.meta.env.VITE_API_URL}/api/transactions/user/${
+                        user.id
+                    }`,
+                );
+
+                const apiTransactions = response.data;
+
+                const transactions: Transaction[] = apiTransactions.map(
+                    (txn: any) => ({
+                        id: txn._id,
+                        name: txn.name,
+                        amount: txn.amount,
+                        category: txn.category,
+                        barcode: txn.barcode,
+                        date: new Date(txn.date),
+                    }),
+                );
+
+                setTransactions(transactions);
+
+                // Calculate total spent from transactions
+                const totalSpent = transactions.reduce(
+                    (sum, txn) => sum + txn.amount,
+                    0,
+                );
+
+                // Update budget with actual spent amount
+                setBudget((prevBudget) => ({
+                    ...prevBudget,
+                    spent: totalSpent,
+                    remaining: prevBudget.weeklyBudget - totalSpent,
+                }));
+            } catch (error) {
+                console.error("Error fetching transactions:", error);
+            }
+        };
+
+        fetchTransactions();
+    }, [user?.id]);
+
     useEffect(() => {
         const savedBudget = localStorage.getItem("aura-budget");
         const savedTransactions = localStorage.getItem("aura-transactions");
@@ -87,33 +173,92 @@ export const BudgetProvider: React.FC<{ children: ReactNode }> = ({
         }
     }, [goal]);
 
-    const addTransaction = (transaction: Omit<Transaction, "id" | "date">) => {
-        const newTransaction: Transaction = {
-            ...transaction,
-            id: Date.now().toString(),
-            date: new Date(),
-        };
+    const addTransaction = async (
+        transaction: Omit<Transaction, "id" | "date">,
+    ) => {
+        try {
+            if (!user?.id) throw new Error("User not authenticated");
 
-        setTransactions([newTransaction, ...transactions]);
+            // Save to database
+            const response = await axios.post(
+                `${import.meta.env.VITE_API_URL}/api/transactions`,
+                {
+                    ...transaction,
+                    userId: user.id,
+                    date: new Date(),
+                },
+            );
 
-        // Update budget
-        const newSpent = budget.spent + transaction.amount;
-        const newRemaining = budget.weeklyBudget - newSpent;
+            const savedTransaction = response.data;
 
-        // Update category spending
-        const updatedCategories = budget.categories.map((cat) => {
-            if (cat.name === transaction.category) {
-                return { ...cat, spent: cat.spent + transaction.amount };
+            // Create transaction object for local state
+            const newTransaction: Transaction = {
+                id: savedTransaction._id,
+                name: savedTransaction.name,
+                amount: savedTransaction.amount,
+                category: savedTransaction.category,
+                categoryId: transaction.categoryId,
+                barcode: savedTransaction.barcode,
+                date: new Date(savedTransaction.date),
+            };
+
+            setTransactions([newTransaction, ...transactions]);
+
+            // Update budget
+            const newSpent = budget.spent + transaction.amount;
+            const newRemaining = budget.weeklyBudget - newSpent;
+
+            // Update category spending in database and local state
+            // Use categoryId if available, otherwise fall back to category name
+            const categoryToUpdate = transaction.categoryId
+                ? budget.categories.find(
+                      (cat) => cat.id === transaction.categoryId,
+                  )
+                : budget.categories.find(
+                      (cat) => cat.name === transaction.category,
+                  );
+
+            if (categoryToUpdate) {
+                const newSpentAmount =
+                    categoryToUpdate.spent + transaction.amount;
+
+                // Update category in database
+                await axios.put(
+                    `${import.meta.env.VITE_API_URL}/api/categories/${
+                        categoryToUpdate.id
+                    }`,
+                    { spent: newSpentAmount },
+                );
+
+                // Update local state
+                const updatedCategories = budget.categories.map((cat) => {
+                    if (cat.id === categoryToUpdate.id) {
+                        return { ...cat, spent: newSpentAmount };
+                    }
+                    return cat;
+                });
+
+                setBudget({
+                    ...budget,
+                    spent: newSpent,
+                    remaining: newRemaining,
+                    categories: updatedCategories,
+                });
+            } else {
+                // If category not found, just update budget totals
+                setBudget({
+                    ...budget,
+                    spent: newSpent,
+                    remaining: newRemaining,
+                });
             }
-            return cat;
-        });
-
-        setBudget({
-            ...budget,
-            spent: newSpent,
-            remaining: newRemaining,
-            categories: updatedCategories,
-        });
+        } catch (error) {
+            console.error("Error adding transaction:", error);
+            if (axios.isAxiosError(error)) {
+                console.error("Response:", error.response?.data);
+            }
+            throw error;
+        }
     };
 
     const calculateImpactFactor = (amount: number): ImpactFactor => {
@@ -157,21 +302,82 @@ export const BudgetProvider: React.FC<{ children: ReactNode }> = ({
     const updateGoalProgress = (amount: number) => {
         if (!goal) return;
 
-        const newAmount = goal.currentAmount + amount;
+        const newAmount = goal.savedAmount + amount;
         const progressPercentage = (newAmount / goal.targetAmount) * 100;
-
-        let progressStage: "wireframe" | "partial" | "complete" = "wireframe";
-        if (progressPercentage >= 100) {
-            progressStage = "complete";
-        } else if (progressPercentage >= 26) {
-            progressStage = "partial";
-        }
 
         setGoalState({
             ...goal,
-            currentAmount: newAmount,
-            progressStage,
+            savedAmount: newAmount,
         });
+    };
+
+    const updateCategoryBudget = async (categoryId: string, amount: number) => {
+        try {
+            // Update in database
+            await axios.put(
+                `${import.meta.env.VITE_API_URL}/api/categories/${categoryId}`,
+                { budgetLimit: amount },
+            );
+
+            // Update local state
+            setBudget((prevBudget) => ({
+                ...prevBudget,
+                categories: prevBudget.categories.map((cat) =>
+                    cat.id === categoryId ? { ...cat, allocated: amount } : cat,
+                ),
+            }));
+        } catch (error) {
+            console.error("Error updating category budget:", error);
+            throw error;
+        }
+    };
+
+    const addCategory = async (
+        name: string,
+        budgetLimit: number,
+        color?: string,
+    ) => {
+        try {
+            if (!user?.id) throw new Error("User not authenticated");
+
+            // Create in database
+            const response = await axios.post(
+                `${import.meta.env.VITE_API_URL}/api/categories`,
+                {
+                    name,
+                    budgetLimit,
+                    color: color || "#6366f1",
+                    userId: user.id,
+                    icon: "pricetag",
+                },
+            );
+
+            // Add to local state
+            const newCategory: CategoryBudget = {
+                id: response.data._id,
+                name: response.data.name,
+                allocated: response.data.budgetLimit,
+                spent: 0,
+                color: response.data.color,
+            };
+
+            setBudget((prevBudget) => ({
+                ...prevBudget,
+                categories: [...prevBudget.categories, newCategory],
+            }));
+        } catch (error) {
+            console.error("Error adding category:", error);
+            if (axios.isAxiosError(error)) {
+                console.error("Response:", error.response?.data);
+                console.error("Request data:", {
+                    name,
+                    budgetLimit,
+                    color,
+                    userId: user?.id,
+                });
+            }
+            throw error;
+        }
     };
 
     return (
@@ -185,6 +391,8 @@ export const BudgetProvider: React.FC<{ children: ReactNode }> = ({
                 calculateOpportunityCost,
                 setGoal,
                 updateGoalProgress,
+                updateCategoryBudget,
+                addCategory,
             }}
         >
             {children}

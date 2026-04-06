@@ -2,6 +2,16 @@
     --background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
 }
 
+.ar-visualizer-container {
+    width: 100%;
+    height: 400px;
+    margin: 16px;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #000;
+    position: relative;
+}
+
 .goal-header-card {
     margin: 16px;
     background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);

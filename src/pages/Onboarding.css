@@ -1,0 +1,80 @@
+.onboarding-content {
+    --background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.slide-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    padding: 40px 20px;
+    text-align: center;
+    color: white;
+}
+
+.slide-icon {
+    font-size: 120px;
+    margin-bottom: 30px;
+    animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+    0%,
+    100% {
+        transform: translateY(0px);
+    }
+    50% {
+        transform: translateY(-20px);
+    }
+}
+
+.slide-content h1 {
+    font-size: 28px;
+    font-weight: bold;
+    margin-bottom: 20px;
+}
+
+.slide-content p {
+    font-size: 16px;
+    line-height: 1.6;
+    opacity: 0.9;
+    max-width: 300px;
+}
+
+.onboarding-footer {
+    position: absolute;
+    bottom: 40px;
+    left: 20px;
+    right: 20px;
+    z-index: 10;
+}
+
+.slide-indicators {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 20px;
+}
+
+.slide-indicators span {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.4);
+    transition: all 0.3s;
+}
+
+.slide-indicators span.active {
+    width: 24px;
+    border-radius: 4px;
+    background: white;
+}
+
+.next-button {
+    --background: white;
+    --color: #667eea;
+    --border-radius: 12px;
+    font-weight: 600;
+    height: 50px;
+}

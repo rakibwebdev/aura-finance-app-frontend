@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
     IonPage,
     IonHeader,
@@ -15,9 +15,9 @@ import {
     IonButtons,
 } from "@ionic/react";
 import { useBudget } from "../contexts/BudgetContext";
-import GoalVisualizer from "../components/GoalVisualizer";
-import "./Goals.css";
 
+import "./Goals.css";
+import DreamVisualizer from "../components/DreamVisualizer";
 const Goals: React.FC = () => {
     const { goal, updateGoalProgress } = useBudget();
 
@@ -42,7 +42,7 @@ const Goals: React.FC = () => {
         );
     }
 
-    const progressPercentage = (goal.currentAmount / goal.targetAmount) * 100;
+    const progressPercentage = (goal.savedAmount / goal.targetAmount) * 100;
 
     const getProgressDescription = () => {
         if (progressPercentage >= 100) {
@@ -70,46 +70,16 @@ const Goals: React.FC = () => {
                 </IonToolbar>
             </IonHeader>
             <IonContent fullscreen className='goals-content'>
-                {/* Goal Header */}
-                <IonCard className='goal-header-card'>
-                    <IonCardHeader>
-                        <IonCardTitle>{goal.name}</IonCardTitle>
-                    </IonCardHeader>
-                    <IonCardContent>
-                        <div className='goal-progress-info'>
-                            <div className='progress-amounts'>
-                                <span className='current-amount'>
-                                    ${goal.currentAmount.toLocaleString()}
-                                </span>
-                                <span className='target-amount'>
-                                    / ${goal.targetAmount.toLocaleString()}
-                                </span>
-                            </div>
-                            <IonProgressBar
-                                value={progressPercentage / 100}
-                                color={
-                                    progressPercentage >= 75
-                                        ? "success"
-                                        : progressPercentage >= 25
-                                          ? "warning"
-                                          : "primary"
-                                }
-                            />
-                            <div className='progress-description'>
-                                <span>{progressPercentage.toFixed(1)}%</span>
-                                <span>{getProgressDescription()}</span>
-                            </div>
-                        </div>
-                    </IonCardContent>
-                </IonCard>
-
                 {/* 3D Visualizer */}
+                <div className='ar-visualizer-container'>
+                    <DreamVisualizer goal={goal} />
+                </div>
+
                 <IonCard>
                     <IonCardHeader>
                         <IonCardTitle>Dream Engine</IonCardTitle>
                     </IonCardHeader>
                     <IonCardContent>
-                        <GoalVisualizer />
                         <div className='visualizer-controls'>
                             <p className='control-hint'>
                                 🔄 Rotate • 🔍 Pinch to zoom • Your {goal.name}{" "}
@@ -127,7 +97,9 @@ const Goals: React.FC = () => {
                     <IonCardContent>
                         <div className='stage-list'>
                             <div
-                                className={`stage-item ${progressPercentage >= 0 ? "active" : ""}`}
+                                className={`stage-item ${
+                                    progressPercentage >= 0 ? "active" : ""
+                                }`}
                             >
                                 <div className='stage-icon'>📐</div>
                                 <div className='stage-details'>
@@ -136,7 +108,9 @@ const Goals: React.FC = () => {
                                 </div>
                             </div>
                             <div
-                                className={`stage-item ${progressPercentage >= 26 ? "active" : ""}`}
+                                className={`stage-item ${
+                                    progressPercentage >= 26 ? "active" : ""
+                                }`}
                             >
                                 <div className='stage-icon'>⚙️</div>
                                 <div className='stage-details'>
@@ -145,7 +119,9 @@ const Goals: React.FC = () => {
                                 </div>
                             </div>
                             <div
-                                className={`stage-item ${progressPercentage >= 100 ? "active" : ""}`}
+                                className={`stage-item ${
+                                    progressPercentage >= 100 ? "active" : ""
+                                }`}
                             >
                                 <div className='stage-icon'>✨</div>
                                 <div className='stage-details'>

@@ -43,7 +43,6 @@ const Dashboard: React.FC = () => {
                 </IonToolbar>
             </IonHeader>
             <IonContent fullscreen className='dashboard-content'>
-                {/* Safe to Spend Card */}
                 <IonCard className='safe-to-spend-card'>
                     <IonCardHeader>
                         <IonCardTitle>Weekly Pulse</IonCardTitle>
@@ -76,13 +75,12 @@ const Dashboard: React.FC = () => {
                     </IonCardContent>
                 </IonCard>
 
-                {/* Category Breakdown */}
                 <IonCard>
                     <IonCardHeader>
                         <IonCardTitle>Category Breakdown</IonCardTitle>
                     </IonCardHeader>
                     <IonCardContent>
-                        <ResponsiveContainer width='100%' height={200}>
+                        <ResponsiveContainer width={"100%"} height={300}>
                             <PieChart>
                                 <Pie
                                     data={chartData}

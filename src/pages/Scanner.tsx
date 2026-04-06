@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
     IonPage,
     IonHeader,
@@ -20,6 +20,7 @@ import {
     IonSelect,
     IonSelectOption,
     IonNote,
+    IonSpinner,
 } from "@ionic/react";
 import { Capacitor } from "@capacitor/core";
 import { useBudget } from "../contexts/BudgetContext";
@@ -28,8 +29,10 @@ import OpportunityCostDisplay from "../components/OpportunityCostDisplay";
 import "./Scanner.css";
 import {
     CapacitorBarcodeScanner,
+    CapacitorBarcodeScannerCameraDirection,
     CapacitorBarcodeScannerTypeHintALLOption,
 } from "@capacitor/barcode-scanner";
+import axios from "axios";
 
 const Scanner: React.FC = () => {
     const {
@@ -39,80 +42,75 @@ const Scanner: React.FC = () => {
         budget,
     } = useBudget();
     const [scanning, setScanning] = useState(false);
+    const [loading, setLoading] = useState(false);
     const [scannedProduct, setScannedProduct] = useState<{
         barcode: string;
         name: string;
         price: number;
-        category: string;
     } | null>(null);
     const [showModal, setShowModal] = useState(false);
+    const [error, setError] = useState("");
+    const [selectedCategoryId, setSelectedCategoryId] = useState<string>("");
 
     // Check if running on web or native
     const isWeb = Capacitor.getPlatform() === "web";
 
-    const mockScan = () => {
-        // Simulate scanning for web/browser testing
-        setScanning(true);
+    const fetchProductByBarcode = async (barcode: string) => {
+        try {
+            setLoading(true);
+            setError("");
 
-        setTimeout(() => {
-            const mockProducts = [
-                { name: "Wireless Headphones", price: 89.99, category: "Tech" },
-                { name: "Coffee Maker", price: 45.5, category: "Other" },
-                { name: "Grocery Items", price: 32.75, category: "Groceries" },
-                {
-                    name: "Movie Ticket",
-                    price: 15.0,
-                    category: "Entertainment",
-                },
-                { name: "USB-C Cable", price: 12.99, category: "Tech" },
-            ];
+            const response = await axios.get(
+                `${import.meta.env.VITE_API_URL}/api/products/${barcode}`,
+            );
 
-            const randomProduct =
-                mockProducts[Math.floor(Math.random() * mockProducts.length)];
+            const product = response.data.data;
 
-            const mockProduct = {
-                barcode: Math.random().toString(36).substring(7).toUpperCase(),
-                ...randomProduct,
-            };
+            setScannedProduct({
+                barcode: product.barcode,
+                name: product.name,
+                price: product.price,
+            });
 
-            setScannedProduct(mockProduct);
             setShowModal(true);
-            setScanning(false);
-        }, 2000); // Simulate 2 second scan
+        } catch (err) {
+            console.error("Error fetching product:", err);
+            if (axios.isAxiosError(err) && err.response?.status === 404) {
+                setError("Product not found. Please enter details manually.");
+                // Show modal with empty product for manual entry
+                setScannedProduct({
+                    barcode: barcode,
+                    name: "",
+                    price: 0,
+                });
+                setShowModal(true);
+            } else {
+                setError("Failed to fetch product. Please try again.");
+            }
+        } finally {
+            setLoading(false);
+        }
     };
 
     const startScan = async () => {
-        // If running on web, use mock scanner
-        if (isWeb) {
-            mockScan();
-            return;
-        }
-
         // Native camera scanning
         try {
             setScanning(true);
+            setError("");
             document.body.classList.add("scanner-active");
 
             const result = await CapacitorBarcodeScanner.scanBarcode({
                 hint: CapacitorBarcodeScannerTypeHintALLOption.ALL,
+                cameraDirection: CapacitorBarcodeScannerCameraDirection.BACK,
             });
 
             if (result.ScanResult) {
-                // Simulate product lookup (in production, this would call an API)
-                const mockProduct = {
-                    barcode: result.ScanResult,
-                    name: "Sample Product",
-                    price: Math.random() * 100 + 10, // Random price between $10-$110
-                    category: "Other",
-                };
-
-                setScannedProduct(mockProduct);
-                setShowModal(true);
+                stopScan();
+                await fetchProductByBarcode(result.ScanResult);
             }
         } catch (error) {
             console.error("Scan error:", error);
-            alert("Failed to start scanner: " + (error as Error).message);
-        } finally {
+            setError("Failed to start scanner: " + (error as Error).message);
             stopScan();
         }
     };
@@ -124,20 +122,36 @@ const Scanner: React.FC = () => {
 
     const confirmPurchase = () => {
         if (scannedProduct) {
+            // Validate fields
+            if (!scannedProduct.name || scannedProduct.price <= 0) {
+                setError("Please enter valid product name and price");
+                return;
+            }
+
+            // Find selected category to get its name
+            const selectedCategory = budget.categories.find(
+                (cat) => cat.id === selectedCategoryId,
+            );
+
             addTransaction({
                 name: scannedProduct.name,
                 amount: scannedProduct.price,
-                category: scannedProduct.category,
+                category: selectedCategory?.name || "Uncategorized",
+                categoryId: selectedCategoryId || undefined,
                 barcode: scannedProduct.barcode,
             });
             setShowModal(false);
             setScannedProduct(null);
+            setSelectedCategoryId("");
+            setError("");
         }
     };
 
     const cancelPurchase = () => {
         setShowModal(false);
         setScannedProduct(null);
+        setSelectedCategoryId("");
+        setError("");
     };
 
     return (
@@ -151,20 +165,18 @@ const Scanner: React.FC = () => {
                 </IonToolbar>
             </IonHeader>
             <IonContent fullscreen className='scanner-content'>
-                {!scanning && (
+                {!scanning && !loading && (
                     <div className='scanner-idle'>
-                        {isWeb && (
-                            <IonNote color='warning' className='demo-badge'>
-                                🖥️ Web Demo Mode - Random products will be
-                                simulated
+                        {error && (
+                            <IonNote color='danger' className='error-message'>
+                                {error}
                             </IonNote>
                         )}
                         <div className='scanner-instructions'>
                             <h2>AR Decision Support</h2>
                             <p>
-                                {isWeb
-                                    ? "Click the button below to simulate scanning a product"
-                                    : "Point your camera at a product barcode to see its impact on your budget"}
+                                Point your camera at a product barcode to see
+                                its impact on your budget
                             </p>
                             <IonButton
                                 expand='block'
@@ -172,7 +184,7 @@ const Scanner: React.FC = () => {
                                 onClick={startScan}
                                 className='scan-button'
                             >
-                                {isWeb ? "Simulate Scan" : "Start Scanning"}
+                                Start Scanning
                             </IonButton>
                         </div>
 
@@ -216,26 +228,28 @@ const Scanner: React.FC = () => {
                     </div>
                 )}
 
+                {/* Loading State */}
+                {loading && (
+                    <div className='scanner-loading'>
+                        <IonSpinner name='crescent' />
+                        <p>Fetching product details...</p>
+                    </div>
+                )}
+
                 {/* Scanning Overlay */}
                 {scanning && (
                     <div className='scanner-overlay'>
                         <div className='scan-region'>
                             <div className='scan-frame'></div>
-                            <p>
-                                {isWeb
-                                    ? "Simulating scan..."
-                                    : "Align barcode within frame"}
-                            </p>
+                            <p>Align barcode within frame</p>
                         </div>
-                        {!isWeb && (
-                            <IonButton
-                                onClick={stopScan}
-                                color='light'
-                                className='cancel-scan'
-                            >
-                                Cancel
-                            </IonButton>
-                        )}
+                        <IonButton
+                            onClick={stopScan}
+                            color='light'
+                            className='cancel-scan'
+                        >
+                            Cancel
+                        </IonButton>
                     </div>
                 )}
 
@@ -254,38 +268,57 @@ const Scanner: React.FC = () => {
                     <IonContent className='modal-content'>
                         {scannedProduct && (
                             <>
+                                {error && (
+                                    <IonNote
+                                        color='warning'
+                                        style={{
+                                            display: "block",
+                                            padding: "16px",
+                                            textAlign: "center",
+                                        }}
+                                    >
+                                        {error}
+                                    </IonNote>
+                                )}
                                 <IonCard>
                                     <IonCardHeader>
                                         <IonCardTitle>
-                                            {scannedProduct.name}
+                                            Product Details
                                         </IonCardTitle>
                                     </IonCardHeader>
                                     <IonCardContent>
-                                        <h2 className='product-price'>
-                                            ${scannedProduct.price.toFixed(2)}
-                                        </h2>
+                                        <IonItem>
+                                            <IonLabel position='stacked'>
+                                                Barcode
+                                            </IonLabel>
+                                            <IonInput
+                                                value={scannedProduct.barcode}
+                                                disabled
+                                            />
+                                        </IonItem>
                                         <IonItem>
                                             <IonLabel position='stacked'>
                                                 Product Name
                                             </IonLabel>
                                             <IonInput
                                                 value={scannedProduct.name}
-                                                onIonChange={(e) =>
+                                                onIonInput={(e) =>
                                                     setScannedProduct({
                                                         ...scannedProduct,
                                                         name: e.detail.value!,
                                                     })
                                                 }
+                                                placeholder='Enter product name'
                                             />
                                         </IonItem>
                                         <IonItem>
                                             <IonLabel position='stacked'>
-                                                Price
+                                                Price ($)
                                             </IonLabel>
                                             <IonInput
                                                 type='number'
                                                 value={scannedProduct.price}
-                                                onIonChange={(e) =>
+                                                onIonInput={(e) =>
                                                     setScannedProduct({
                                                         ...scannedProduct,
                                                         price:
@@ -294,25 +327,25 @@ const Scanner: React.FC = () => {
                                                             ) || 0,
                                                     })
                                                 }
+                                                placeholder='Enter price'
                                             />
                                         </IonItem>
                                         <IonItem>
                                             <IonLabel>Category</IonLabel>
                                             <IonSelect
-                                                value={scannedProduct.category}
+                                                value={selectedCategoryId}
                                                 onIonChange={(e) =>
-                                                    setScannedProduct({
-                                                        ...scannedProduct,
-                                                        category:
-                                                            e.detail.value,
-                                                    })
+                                                    setSelectedCategoryId(
+                                                        e.detail.value,
+                                                    )
                                                 }
+                                                placeholder='Select a category'
                                             >
                                                 {budget.categories.map(
                                                     (cat) => (
                                                         <IonSelectOption
                                                             key={cat.id}
-                                                            value={cat.name}
+                                                            value={cat.id}
                                                         >
                                                             {cat.name}
                                                         </IonSelectOption>
@@ -323,17 +356,21 @@ const Scanner: React.FC = () => {
                                     </IonCardContent>
                                 </IonCard>
 
-                                <ImpactDisplay
-                                    impact={calculateImpactFactor(
-                                        scannedProduct.price,
-                                    )}
-                                />
+                                {scannedProduct.price > 0 && (
+                                    <>
+                                        <ImpactDisplay
+                                            impact={calculateImpactFactor(
+                                                scannedProduct.price,
+                                            )}
+                                        />
 
-                                <OpportunityCostDisplay
-                                    opportunityCost={calculateOpportunityCost(
-                                        scannedProduct.price,
-                                    )}
-                                />
+                                        <OpportunityCostDisplay
+                                            opportunityCost={calculateOpportunityCost(
+                                                scannedProduct.price,
+                                            )}
+                                        />
+                                    </>
+                                )}
 
                                 <div className='action-buttons'>
                                     <IonButton

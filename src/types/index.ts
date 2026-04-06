@@ -19,6 +19,7 @@ export interface Transaction {
     name: string;
     amount: number;
     category: string;
+    categoryId?: string;
     date: Date;
     barcode?: string;
 }
@@ -26,11 +27,10 @@ export interface Transaction {
 export interface Goal {
     id: string;
     name: string;
+    modelName: string;
     targetAmount: number;
-    currentAmount: number;
-    modelType: "3d-object";
-    assetUrl?: string;
-    progressStage: "wireframe" | "partial" | "complete";
+    savedAmount: number;
+    currency: string;
 }
 
 export interface Product {
