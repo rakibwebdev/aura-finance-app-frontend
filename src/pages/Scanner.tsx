@@ -32,6 +32,7 @@ import {
     CapacitorBarcodeScannerCameraDirection,
     CapacitorBarcodeScannerTypeHintALLOption,
 } from "@capacitor/barcode-scanner";
+import { CapacitorBarcodeScannerWeb } from "@capacitor/barcode-scanner/dist/esm/web";
 import axios from "axios";
 
 const Scanner: React.FC = () => {
@@ -52,8 +53,22 @@ const Scanner: React.FC = () => {
     const [error, setError] = useState("");
     const [selectedCategoryId, setSelectedCategoryId] = useState<string>("");
 
-    // Check if running on web or native
-    const isWeb = Capacitor.getPlatform() === "web";
+    const isWebPlatform = Capacitor.getPlatform() === "web";
+    const barcodeScanOptions = {
+        hint: CapacitorBarcodeScannerTypeHintALLOption.ALL,
+        cameraDirection: CapacitorBarcodeScannerCameraDirection.BACK,
+    };
+
+    const scanBarcodeOnWeb = async () => {
+        const webScanner = new CapacitorBarcodeScannerWeb();
+        return webScanner.scanBarcode({
+            ...barcodeScanOptions,
+            web: {
+                showCameraSelection: false,
+                scannerFPS: 30,
+            },
+        });
+    };
 
     const fetchProductByBarcode = async (barcode: string) => {
         try {
@@ -93,16 +108,14 @@ const Scanner: React.FC = () => {
     };
 
     const startScan = async () => {
-        // Native camera scanning
         try {
             setScanning(true);
             setError("");
             document.body.classList.add("scanner-active");
 
-            const result = await CapacitorBarcodeScanner.scanBarcode({
-                hint: CapacitorBarcodeScannerTypeHintALLOption.ALL,
-                cameraDirection: CapacitorBarcodeScannerCameraDirection.BACK,
-            });
+            const result = isWebPlatform
+                ? await scanBarcodeOnWeb()
+                : await CapacitorBarcodeScanner.scanBarcode(barcodeScanOptions);
 
             if (result.ScanResult) {
                 stopScan();
@@ -110,7 +123,31 @@ const Scanner: React.FC = () => {
             }
         } catch (error) {
             console.error("Scan error:", error);
-            setError("Failed to start scanner: " + (error as Error).message);
+
+            const errorMessage =
+                error instanceof Error ? error.message : String(error);
+            const shouldFallbackToWebScanner =
+                !isWebPlatform && /not implemented/i.test(errorMessage);
+
+            if (shouldFallbackToWebScanner) {
+                try {
+                    const fallbackResult = await scanBarcodeOnWeb();
+
+                    if (fallbackResult.ScanResult) {
+                        stopScan();
+                        await fetchProductByBarcode(fallbackResult.ScanResult);
+                    }
+
+                    return;
+                } catch (fallbackError) {
+                    console.error(
+                        "Web scanner fallback failed:",
+                        fallbackError,
+                    );
+                }
+            }
+
+            setError("Failed to start scanner: " + errorMessage);
             stopScan();
         }
     };
@@ -293,7 +330,14 @@ const Scanner: React.FC = () => {
                                             </IonLabel>
                                             <IonInput
                                                 value={scannedProduct.barcode}
-                                                disabled
+                                                disabled={!isWebPlatform}
+                                                onIonInput={(e) =>
+                                                    setScannedProduct({
+                                                        ...scannedProduct,
+                                                        barcode:
+                                                            e.detail.value!,
+                                                    })
+                                                }
                                             />
                                         </IonItem>
                                         <IonItem>

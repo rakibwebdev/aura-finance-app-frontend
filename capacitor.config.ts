@@ -4,6 +4,7 @@ const config: CapacitorConfig = {
     appId: "com.aurafinance.app",
     appName: "Aura Finance",
     webDir: "dist",
+    includePlugins: ["@capacitor/barcode-scanner"],
     plugins: {
         SplashScreen: {
             launchShowDuration: 0,

@@ -7,7 +7,7 @@
         "dev": "vite",
         "build": "tsc && vite build --mode production",
         "preview": "vite preview",
-        "build:ios": "ionic build && npx cap sync ios && npx cap open ios",
+        "build:ios": "ionic build && npx cap sync ios && node scripts/ensure-ios-capacitor-config.mjs && npx cap open ios",
         "test.e2e": "cypress run",
         "test.unit": "vitest",
         "lint": "eslint"

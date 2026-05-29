@@ -121,8 +121,8 @@ const DreamVisualizer: React.FC<{ goal: Goal }> = ({ goal }) => {
                     }}
                 >
                     {goal.currency}
-                    {goal.savedAmount.toLocaleString()} of {goal.currency}
-                    {goal.targetAmount.toLocaleString()}
+                    {/* {goal.savedAmount.toLocaleString()} of {goal.currency}
+                    {goal.targetAmount.toLocaleString()} */}
                 </p>
 
                 <IonProgressBar
