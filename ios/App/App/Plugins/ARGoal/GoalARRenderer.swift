@@ -23,11 +23,11 @@ class GoalARRenderer {
     // MARK: - Attach (used for both fresh placement and restoration)
 
     func attachModel(name: String, progress: Float, size: Float, to anchor: AnchorEntity) {
-        print("🔍 Loading model: \(name).usdz")
+        print("Loading model: \(name).usdz")
 
         do {
             let model = try ModelEntity.loadModel(named: name)
-            print("✅ Model loaded: \(name)")
+            print("Model loaded: \(name)")
 
             scaleModelToFit(model: model, desiredSize: size)
             applyProgress(to: model, progress: progress)
@@ -35,7 +35,7 @@ class GoalARRenderer {
             self.modelEntity = model
 
         } catch {
-            print("❌ Failed to load model '\(name)': \(error)")
+            print("Failed to load model '\(name)': \(error)")
 
             var material   = SimpleMaterial()
             material.color = .init(tint: .red)
@@ -62,8 +62,8 @@ class GoalARRenderer {
         let scale = desiredSize / maxDim
         model.scale = SIMD3<Float>(repeating: scale)
 
-        print("📐 Model dimensions: \(width)w x \(height)h x \(depth)d")
-        print("📐 Scale applied: \(scale) to fit \(desiredSize)m")
+        print("Model dimensions: \(width)w x \(height)h x \(depth)d")
+        print("Scale applied: \(scale) to fit \(desiredSize)m")
     }
 
     // MARK: - Progress

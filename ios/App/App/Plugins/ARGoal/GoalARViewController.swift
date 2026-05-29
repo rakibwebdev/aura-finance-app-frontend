@@ -34,12 +34,12 @@ class GoalARViewController: UIViewController, ARSessionDelegate {
         setupUI()
 
         if let worldMap = loadWorldMap(for: goalID) {
-            print("✅ Saved world map found — attempting to restore")
+            print("Saved world map found — attempting to restore")
             isRestoringFromSave = true
             updateStatusLabel("Point camera at where you placed the goal...")
             startSession(with: worldMap)
         } else {
-            print("📍 No saved map — fresh placement mode")
+            print("No saved map — fresh placement mode")
             updateStatusLabel("Move phone slowly to scan floor, then tap")
             startSession(with: nil)
         }
@@ -108,7 +108,7 @@ class GoalARViewController: UIViewController, ARSessionDelegate {
         let modelAnchor = frame.anchors.first { !($0 is ARPlaneAnchor) }
 
         if let anchor = modelAnchor {
-            print("✅ Anchor found — restoring model at saved position")
+            print("Anchor found — restoring model at saved position")
             let anchorEntity = AnchorEntity(anchor: anchor)
             renderer.attachModel(
                 name:     modelName,
@@ -122,7 +122,7 @@ class GoalARViewController: UIViewController, ARSessionDelegate {
             updateStatusLabel("Goal restored!")
             onDone?(anchor.identifier.uuidString)
         } else {
-            print("⚠️ No saved anchor found — falling back to fresh placement")
+            print("No saved anchor found — falling back to fresh placement")
             isRestoringFromSave = false
             updateStatusLabel("Could not restore — tap to place again")
         }
@@ -214,7 +214,7 @@ class GoalARViewController: UIViewController, ARSessionDelegate {
     private func saveWorldMap(for goalID: String, completion: @escaping () -> Void) {
         arView.session.getCurrentWorldMap { worldMap, error in
             guard let map = worldMap else {
-                print("⚠️ Could not get world map: \(error?.localizedDescription ?? "unknown")")
+                print("Could not get world map: \(error?.localizedDescription ?? "unknown")")
                 completion()
                 return
             }
@@ -224,9 +224,9 @@ class GoalARViewController: UIViewController, ARSessionDelegate {
                     requiringSecureCoding: true
                 )
                 try data.write(to: self.worldMapURL(for: goalID), options: [.atomic])
-                print("✅ World map saved for goal: \(goalID)")
+                print("World map saved for goal: \(goalID)")
             } catch {
-                print("❌ Failed to save world map: \(error)")
+                print("Failed to save world map: \(error)")
             }
             completion()
         }
@@ -243,10 +243,10 @@ class GoalARViewController: UIViewController, ARSessionDelegate {
                 ofClass: ARWorldMap.self,
                 from:    data
             )
-            print("✅ World map loaded for goal: \(goalID)")
+            print("World map loaded for goal: \(goalID)")
             return map
         } catch {
-            print("❌ Failed to load world map: \(error)")
+            print("Failed to load world map: \(error)")
             return nil
         }
     }
