@@ -66,6 +66,24 @@ class GoalARRenderer {
         print("Scale applied: \(scale) to fit \(desiredSize)m")
     }
 
+    func resizeModel(by scaleFactor: Float) {
+        guard let model = modelEntity else { return }
+
+        let currentScale = (model.scale.x + model.scale.y + model.scale.z) / 3.0
+        let nextScale = max(0.05, min(currentScale * scaleFactor, 0.6))
+
+        model.scale = SIMD3<Float>(repeating: nextScale)
+    }
+
+    func rotateModel(by radians: Float) {
+        guard let model = modelEntity else { return }
+
+        var transform = model.transform
+        let deltaRotation = simd_quatf(angle: radians, axis: [0, 1, 0])
+        transform.rotation = simd_mul(deltaRotation, transform.rotation)
+        model.transform = transform
+    }
+
     // MARK: - Progress
 
     func updateProgress(_ progress: Float) {

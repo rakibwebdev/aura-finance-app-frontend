@@ -64,6 +64,7 @@ const DreamVisualizer: React.FC<{ goal: Goal }> = ({ goal }) => {
                 model: goal.modelName,
                 progress: progress,
                 goalID: goal.id, // ← each goal gets its own world map
+                anchorID: anchorID ?? undefined,
             });
 
             // Persist the anchor ID

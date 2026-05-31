@@ -16,6 +16,7 @@ public class GoalARPlugin: CAPPlugin, CAPBridgedPlugin {
         let modelName  = call.getString("model")     ?? "toy_car"
         let progress   = call.getFloat("progress")   ?? 0.0
         let goalID     = call.getString("goalID")    ?? "default"
+        let anchorID   = call.getString("anchorID")
         let modelSize  = call.getFloat("modelSize")  ?? 0.5  // ← added
 
         let status = AVCaptureDevice.authorizationStatus(for: .video)
@@ -23,13 +24,15 @@ public class GoalARPlugin: CAPPlugin, CAPBridgedPlugin {
         switch status {
         case .authorized:
             self.presentAR(modelName: modelName, progress: progress,
-                           goalID: goalID, modelSize: modelSize, call: call)
+                           goalID: goalID, anchorID: anchorID,
+                           modelSize: modelSize, call: call)
 
         case .notDetermined:
             AVCaptureDevice.requestAccess(for: .video) { granted in
                 if granted {
                     self.presentAR(modelName: modelName, progress: progress,
-                                   goalID: goalID, modelSize: modelSize, call: call)
+                                   goalID: goalID, anchorID: anchorID,
+                                   modelSize: modelSize, call: call)
                 } else {
                     call.reject("Camera access denied")
                 }
@@ -65,13 +68,14 @@ public class GoalARPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     private func presentAR(modelName: String, progress: Float,
-                            goalID: String, modelSize: Float,  // ← added modelSize
+                            goalID: String, anchorID: String?, modelSize: Float,  // ← added modelSize
                             call: CAPPluginCall) {
         DispatchQueue.main.async {
             let vc        = GoalARViewController()
             vc.modelName  = modelName
             vc.progress   = progress
             vc.goalID     = goalID
+            vc.anchorID   = anchorID
             vc.modelSize  = modelSize  // ← added
             vc.onDone = { anchorID in
                 call.resolve(["anchorID": anchorID])

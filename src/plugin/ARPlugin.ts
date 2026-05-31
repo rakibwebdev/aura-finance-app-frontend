@@ -5,6 +5,7 @@ export interface GoalARPlugin {
         model: string;
         progress: number;
         goalID: string; // ← add this
+        anchorID?: string;
     }): Promise<{ anchorID: string }>;
 
     updateProgress(options: { progress: number }): Promise<void>;

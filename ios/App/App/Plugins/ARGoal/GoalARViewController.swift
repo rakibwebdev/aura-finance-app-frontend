@@ -2,13 +2,14 @@ import UIKit
 import ARKit
 import RealityKit
 
-class GoalARViewController: UIViewController, ARSessionDelegate {
+class GoalARViewController: UIViewController, ARSessionDelegate, UIGestureRecognizerDelegate {
 
     static weak var current: GoalARViewController?
 
     var modelName: String = "toy_car"
     var progress: Float   = 0.0
     var goalID: String    = ""
+    var anchorID: String? = nil
     var modelSize: Float  = 0.5
     var onDone: ((String) -> Void)?
 
@@ -17,6 +18,7 @@ class GoalARViewController: UIViewController, ARSessionDelegate {
     private var hasPlacedModel      = false
     private var isRestoringFromSave = false
     private var statusLabel:        UILabel?
+    private var lastRotationValue:  CGFloat = 0
 
     // MARK: - Lifecycle
 
@@ -104,8 +106,15 @@ class GoalARViewController: UIViewController, ARSessionDelegate {
         guard !hasPlacedModel else { return }
         guard let frame = arView.session.currentFrame else { return }
 
-        // Find the model anchor — any anchor that is not a plane
-        let modelAnchor = frame.anchors.first { !($0 is ARPlaneAnchor) }
+        // Prefer the exact saved anchor ID, then fall back to any non-plane anchor.
+        let modelAnchor: ARAnchor? = {
+            if let anchorID,
+               let savedUUID = UUID(uuidString: anchorID) {
+                return frame.anchors.first { $0.identifier == savedUUID }
+            }
+
+            return frame.anchors.first { !($0 is ARPlaneAnchor) }
+        }()
 
         if let anchor = modelAnchor {
             print("Anchor found — restoring model at saved position")
@@ -187,7 +196,7 @@ class GoalARViewController: UIViewController, ARSessionDelegate {
         arView.scene.addAnchor(anchorEntity)
 
         hasPlacedModel = true
-        updateStatusLabel("Saving...")
+        updateStatusLabel("Pinch to resize, rotate with two fingers")
 
         saveWorldMap(for: goalID) {
             self.updateStatusLabel("Goal placed and saved!")
@@ -199,6 +208,21 @@ class GoalARViewController: UIViewController, ARSessionDelegate {
 
     func updateProgress(_ value: Float) {
         renderer.updateProgress(value)
+    }
+
+    @objc private func handlePinch(_ recognizer: UIPinchGestureRecognizer) {
+        guard hasPlacedModel else { return }
+
+        renderer.resizeModel(by: Float(recognizer.scale))
+        recognizer.scale = 1.0
+    }
+
+    @objc private func handleRotation(_ recognizer: UIRotationGestureRecognizer) {
+        guard hasPlacedModel else { return }
+
+        let rotationDelta = Float(recognizer.rotation)
+        renderer.rotateModel(by: rotationDelta)
+        recognizer.rotation = 0
     }
 
     // MARK: - World Map persistence
@@ -277,7 +301,16 @@ class GoalARViewController: UIViewController, ARSessionDelegate {
         view.addSubview(closeBtn)
 
         let tap = UITapGestureRecognizer(target: self, action: #selector(onTap))
+        tap.delegate = self
         arView.addGestureRecognizer(tap)
+
+        let pinch = UIPinchGestureRecognizer(target: self, action: #selector(handlePinch(_:)))
+        pinch.delegate = self
+        arView.addGestureRecognizer(pinch)
+
+        let rotation = UIRotationGestureRecognizer(target: self, action: #selector(handleRotation(_:)))
+        rotation.delegate = self
+        arView.addGestureRecognizer(rotation)
 
         NSLayoutConstraint.activate([
             status.bottomAnchor.constraint(
@@ -306,5 +339,10 @@ class GoalARViewController: UIViewController, ARSessionDelegate {
 
     @objc func close() {
         dismiss(animated: true)
+    }
+
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
+                           shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+        true
     }
 }
