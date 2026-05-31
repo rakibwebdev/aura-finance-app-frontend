@@ -55,6 +55,15 @@ ion-textarea {
     background: rgba(255, 255, 255, 0.02);
     border-radius: 10px;
     border: 1px solid rgba(255, 255, 255, 0.03);
+    margin-top: 6px;
+}
+.native-input.sc-ion-input-md {
+    padding-left: 10px;
+}
+.label-stacked.sc-ion-label-md-h {
+    -webkit-transform: unset;
+    transform: unset;
+    text-transform: capitalize;
 }
 
 /* Tab Bar */
@@ -123,4 +132,9 @@ ion-tab-button {
     ion-tab-bar {
         --padding: 10px 18px;
     }
+}
+
+/* Avoid extra gap after the last item */
+.list-md .item:not(:last-child) {
+    margin-bottom: 12px !important;
 }

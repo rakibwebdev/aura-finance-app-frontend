@@ -35,13 +35,10 @@ function Budget() {
     const [newCategoryColor, setNewCategoryColor] = useState("#6366f1");
 
     useEffect(() => {
-        const newBudgets = budget.categories.reduce(
-            (acc, cat) => {
-                acc[cat.id] = cat.allocated || 0;
-                return acc;
-            },
-            {} as { [key: string]: number },
-        );
+        const newBudgets = budget.categories.reduce((acc, cat) => {
+            acc[cat.id] = cat.allocated || 0;
+            return acc;
+        }, {} as { [key: string]: number });
         setBudgets(newBudgets);
     }, [budget.categories]);
 
@@ -196,7 +193,7 @@ function Budget() {
                             </div>
                         </IonCardHeader>
                         <IonCardContent>
-                            <IonList>
+                            <IonList lines='none'>
                                 {budget.categories.map((category) => (
                                     <IonItem key={category.id}>
                                         <div
@@ -268,7 +265,7 @@ function Budget() {
                         </IonToolbar>
                     </IonHeader>
                     <IonContent>
-                        <div style={{ padding: "16px" }}>
+                        <IonList lines='none' style={{ padding: "16px" }}>
                             <IonItem>
                                 <IonLabel position='stacked'>
                                     Category Name
@@ -345,7 +342,7 @@ function Budget() {
                             >
                                 {loading ? "Adding..." : "Add Category"}
                             </IonButton>
-                        </div>
+                        </IonList>
                     </IonContent>
                 </IonModal>
 
