@@ -1,0 +1,24 @@
+.page-header-toolbar {
+    --padding-start: 16px;
+    --padding-end: 16px;
+}
+
+.page-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    gap: 12px;
+}
+
+.page-header-start,
+.page-header-end {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+}
+
+.page-header-end {
+    justify-content: flex-end;
+    margin-left: auto;
+}

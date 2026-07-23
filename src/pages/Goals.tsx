@@ -13,25 +13,28 @@ import {
     IonButton,
     IonBackButton,
     IonButtons,
+    IonModal,
+    IonInput,
+    IonText,
 } from "@ionic/react";
 import { useBudget } from "../contexts/BudgetContext";
+import PageHeader from "../components/PageHeader";
 
 import "./Goals.css";
 import DreamVisualizer from "../components/DreamVisualizer";
 const Goals: React.FC = () => {
-    const { goal, updateGoalProgress } = useBudget();
+    const { goal, updateGoalProgress, setGoal } = useBudget();
+    const [showAddSavingsModal, setShowAddSavingsModal] = useState(false);
+    const [showGoalAmountModal, setShowGoalAmountModal] = useState(false);
+    const [savingsAmount, setSavingsAmount] = useState("1000");
+    const [goalAmount, setGoalAmount] = useState("3000");
+    const [savingsError, setSavingsError] = useState("");
+    const [goalAmountError, setGoalAmountError] = useState("");
 
     if (!goal) {
         return (
             <IonPage>
-                <IonHeader>
-                    <IonToolbar color='primary'>
-                        <IonButtons slot='start'>
-                            <IonBackButton defaultHref='/dashboard' />
-                        </IonButtons>
-                        <IonTitle>Goals</IonTitle>
-                    </IonToolbar>
-                </IonHeader>
+                <PageHeader title='Goals' backHref='/dashboard' />
                 <IonContent>
                     <div className='no-goal'>
                         <h2>No Goal Set</h2>
@@ -54,21 +57,71 @@ const Goals: React.FC = () => {
         }
     };
 
-    const handleAddSavings = () => {
-        // In a real app, this would open a modal to add savings
-        updateGoalProgress(1000);
+    const openAddSavingsModal = () => {
+        setSavingsError("");
+        setSavingsAmount("1000");
+        setShowAddSavingsModal(true);
+    };
+
+    const openGoalAmountModal = () => {
+        setGoalAmountError("");
+        setGoalAmount(String(goal.targetAmount));
+        setShowGoalAmountModal(true);
+    };
+
+    const closeAddSavingsModal = () => {
+        setShowAddSavingsModal(false);
+        setSavingsError("");
+    };
+
+    const closeGoalAmountModal = () => {
+        setShowGoalAmountModal(false);
+        setGoalAmountError("");
+    };
+
+    const handleSaveSavings = () => {
+        const amount = Number(savingsAmount);
+
+        if (!Number.isFinite(amount) || amount <= 0) {
+            setSavingsError("Enter a valid savings amount greater than 0.");
+            return;
+        }
+
+        updateGoalProgress(amount);
+        closeAddSavingsModal();
+    };
+
+    const handleSaveGoalAmount = () => {
+        const amount = Number(goalAmount);
+
+        if (!Number.isFinite(amount) || amount <= 0) {
+            setGoalAmountError("Enter a valid goal amount greater than 0.");
+            return;
+        }
+
+        setGoal({
+            ...goal,
+            targetAmount: amount,
+        });
+        closeGoalAmountModal();
+    };
+
+    const handleResetGoal = () => {
+        const shouldReset = window.confirm(
+            "Reset your saved goal amount to 0? This will clear your current progress.",
+        );
+
+        if (!shouldReset) return;
+
+        setGoal({
+            ...goal,
+            savedAmount: 0,
+        });
     };
 
     return (
         <IonPage>
-            <IonHeader>
-                <IonToolbar color='primary'>
-                    <IonButtons slot='start'>
-                        <IonBackButton defaultHref='/dashboard' />
-                    </IonButtons>
-                    <IonTitle>3D Goal Materialization</IonTitle>
-                </IonToolbar>
-            </IonHeader>
+            <PageHeader title='3D Goal Materialization' backHref='/dashboard' />
             <IonContent fullscreen className='goals-content'>
                 {/* 3D Visualizer */}
                 <div className='ar-visualizer-container'>
@@ -141,12 +194,151 @@ const Goals: React.FC = () => {
                     <IonButton
                         expand='block'
                         size='large'
-                        onClick={handleAddSavings}
+                        onClick={openAddSavingsModal}
                         className='add-savings-btn'
                     >
                         Add Savings
                     </IonButton>
+                    <IonButton
+                        expand='block'
+                        fill='outline'
+                        color='medium'
+                        onClick={openGoalAmountModal}
+                        className='goal-amount-btn'
+                    >
+                        Set Goal Amount
+                    </IonButton>
+                    <IonButton
+                        expand='block'
+                        fill='outline'
+                        color='medium'
+                        onClick={handleResetGoal}
+                        className='reset-goal-btn'
+                    >
+                        Reset Goal Amount
+                    </IonButton>
                 </div>
+
+                <IonModal
+                    isOpen={showAddSavingsModal}
+                    onDidDismiss={closeAddSavingsModal}
+                    className='add-savings-modal'
+                >
+                    <IonHeader>
+                        <IonToolbar color='primary'>
+                            <IonTitle>Add Savings</IonTitle>
+                            <IonButtons slot='end'>
+                                <IonButton onClick={closeAddSavingsModal}>
+                                    Cancel
+                                </IonButton>
+                            </IonButtons>
+                        </IonToolbar>
+                    </IonHeader>
+
+                    <IonCard className='add-savings-card'>
+                        <IonCardHeader>
+                            <IonCardTitle>Add savings amount</IonCardTitle>
+                        </IonCardHeader>
+                        <IonCardContent>
+                            <IonInput
+                                type='number'
+                                inputMode='decimal'
+                                min='0'
+                                step='0.01'
+                                value={savingsAmount}
+                                placeholder='Enter savings amount'
+                                label={`Amount (${goal.currency})`}
+                                labelPlacement='floating'
+                                fill='outline'
+                                className='add-savings-input'
+                                onIonInput={(event) =>
+                                    setSavingsAmount(event.detail.value ?? "")
+                                }
+                            />
+
+                            {savingsError && (
+                                <IonText color='danger'>
+                                    <p className='add-savings-error'>
+                                        {savingsError}
+                                    </p>
+                                </IonText>
+                            )}
+
+                            <div className='add-savings-actions'>
+                                <IonButton
+                                    expand='block'
+                                    onClick={handleSaveSavings}
+                                    className='add-savings-confirm-btn'
+                                >
+                                    Save Savings
+                                </IonButton>
+                            </div>
+                        </IonCardContent>
+                    </IonCard>
+                </IonModal>
+
+                <IonModal
+                    isOpen={showGoalAmountModal}
+                    onDidDismiss={closeGoalAmountModal}
+                    className='goal-amount-modal'
+                >
+                    <IonHeader>
+                        <IonToolbar color='primary'>
+                            <IonTitle>Set Goal Amount</IonTitle>
+                            <IonButtons slot='end'>
+                                <IonButton onClick={closeGoalAmountModal}>
+                                    Cancel
+                                </IonButton>
+                            </IonButtons>
+                        </IonToolbar>
+                    </IonHeader>
+
+                    <IonCard className='goal-amount-card'>
+                        <IonCardHeader>
+                            <IonCardTitle>Update your target</IonCardTitle>
+                        </IonCardHeader>
+                        <IonCardContent>
+                            <p className='goal-amount-hint'>
+                                Current goal: {goal.currency}
+                                {goal.targetAmount.toLocaleString()}
+                            </p>
+
+                            <IonInput
+                                type='number'
+                                inputMode='decimal'
+                                min='0'
+                                step='0.01'
+                                value={goalAmount}
+                                placeholder='Enter goal amount'
+                                label={`Goal Amount (${goal.currency})`}
+                                labelPlacement='floating'
+                                fill='outline'
+                                className='goal-amount-input'
+                                onIonInput={(event) =>
+                                    setGoalAmount(event.detail.value ?? "")
+                                }
+                            />
+
+                            {goalAmountError && (
+                                <IonText color='danger'>
+                                    <p className='goal-amount-error'>
+                                        {goalAmountError}
+                                    </p>
+                                </IonText>
+                            )}
+
+                            <div className='goal-amount-actions'>
+                                <IonButton
+                                    expand='block'
+                                    onClick={handleSaveGoalAmount}
+                                    className='goal-amount-confirm-btn'
+                                >
+                                    Save Goal Amount
+                                </IonButton>
+                            </div>
+                        </IonCardContent>
+                    </IonCard>
+                </IonModal>
             </IonContent>
         </IonPage>
     );

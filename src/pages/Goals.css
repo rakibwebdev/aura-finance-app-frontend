@@ -120,6 +120,116 @@
     font-weight: 600;
 }
 
+.reset-goal-btn {
+    margin-top: 12px;
+    --border-radius: 12px;
+    height: 52px;
+    font-weight: 600;
+}
+
+.goal-amount-btn {
+    margin-top: 12px;
+    --border-radius: 12px;
+    height: 52px;
+    font-weight: 600;
+}
+
+.add-savings-modal {
+    --width: min(92vw, 420px);
+    --height: auto;
+    --border-radius: 18px;
+}
+
+.goal-amount-modal {
+    --width: min(92vw, 420px);
+    --height: auto;
+    --border-radius: 18px;
+}
+
+.add-savings-modal-content {
+    --background: #0f172a;
+    padding: 16px;
+}
+
+.add-savings-card {
+    margin: 0;
+    background: #111827;
+    color: #f8fafc;
+}
+
+.add-savings-card ion-card-title {
+    color: #f8fafc;
+    font-size: 18px;
+}
+
+.goal-amount-card {
+    margin: 0;
+    background: #111827;
+    color: #f8fafc;
+}
+
+.goal-amount-card ion-card-title {
+    color: #f8fafc;
+    font-size: 18px;
+}
+
+.goal-amount-hint {
+    margin: 0 0 12px;
+    color: #cbd5e1;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.add-savings-input {
+    margin-top: 12px;
+    --background: #0f172a;
+    --color: #f8fafc;
+    --placeholder-color: #94a3b8;
+    --highlight-color-focused: #10b981;
+    --border-color: rgba(148, 163, 184, 0.35);
+}
+
+.goal-amount-input {
+    margin-top: 12px;
+    --background: #0f172a;
+    --color: #f8fafc;
+    --placeholder-color: #94a3b8;
+    --highlight-color-focused: #8b5cf6;
+    --border-color: rgba(148, 163, 184, 0.35);
+}
+
+.goal-amount-error {
+    margin: 0 8px 16px;
+    font-size: 14px;
+}
+
+.goal-amount-actions {
+    padding: 0 0 8px;
+}
+
+.goal-amount-confirm-btn {
+    --background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
+    --border-radius: 12px;
+    height: 52px;
+    font-weight: 600;
+}
+
+.add-savings-error {
+    margin: 0 8px 16px;
+    font-size: 14px;
+}
+
+.add-savings-actions {
+    padding: 0 0 8px;
+}
+
+.add-savings-confirm-btn {
+    --background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    --border-radius: 12px;
+    height: 52px;
+    font-weight: 600;
+}
+
 .no-goal {
     display: flex;
     flex-direction: column;

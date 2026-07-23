@@ -70,7 +70,7 @@ class GoalARRenderer {
         guard let model = modelEntity else { return }
 
         let currentScale = (model.scale.x + model.scale.y + model.scale.z) / 3.0
-        let nextScale = max(0.05, min(currentScale * scaleFactor, 0.6))
+        let nextScale = max(0.05, min(currentScale * scaleFactor, 0.35))
 
         model.scale = SIMD3<Float>(repeating: nextScale)
     }

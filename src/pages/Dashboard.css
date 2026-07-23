@@ -73,3 +73,11 @@ ion-card-title {
     font-size: 18px;
     font-weight: 600;
 }
+
+/* Capitalize category headings and small labels */
+.dashboard-content ion-item h2,
+.dashboard-content ion-item p,
+.dashboard-content .budget-stats small,
+.dashboard-content .safe-amount p {
+    text-transform: capitalize;
+}

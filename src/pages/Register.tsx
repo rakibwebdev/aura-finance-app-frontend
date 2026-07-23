@@ -1,19 +1,15 @@
 import React, { useState } from "react";
 import {
     IonPage,
-    IonHeader,
-    IonToolbar,
-    IonTitle,
     IonContent,
     IonButton,
-    IonButtons,
-    IonBackButton,
     IonIcon,
     IonLoading,
 } from "@ionic/react";
 import { personAdd } from "ionicons/icons";
 import { useAuth } from "../contexts/AuthContext";
 import FormInput from "../components/FormInput";
+import PageHeader from "../components/PageHeader";
 import "./Auth.css";
 import axios from "axios";
 
@@ -89,14 +85,11 @@ const Register: React.FC<RegisterProps> = ({ onSuccess }) => {
 
     return (
         <IonPage>
-            <IonHeader>
-                <IonToolbar color='primary'>
-                    <IonButtons slot='start'>
-                        <IonBackButton defaultHref='/auth' />
-                    </IonButtons>
-                    <IonTitle>Create Account</IonTitle>
-                </IonToolbar>
-            </IonHeader>
+            <PageHeader
+                title='Create Account'
+                backHref='/auth'
+                showLogout={false}
+            />
             <IonContent fullscreen className='auth-content'>
                 <div className='auth-form-container'>
                     <div className='auth-logo-small'>💰</div>

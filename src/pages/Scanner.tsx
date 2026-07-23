@@ -1,9 +1,6 @@
 import React, { useEffect, useState } from "react";
 import {
     IonPage,
-    IonHeader,
-    IonToolbar,
-    IonTitle,
     IonContent,
     IonButton,
     IonCard,
@@ -21,11 +18,15 @@ import {
     IonSelectOption,
     IonNote,
     IonSpinner,
+    IonHeader,
+    IonToolbar,
+    IonTitle,
 } from "@ionic/react";
 import { Capacitor } from "@capacitor/core";
 import { useBudget } from "../contexts/BudgetContext";
 import ImpactDisplay from "../components/ImpactDisplay";
 import OpportunityCostDisplay from "../components/OpportunityCostDisplay";
+import PageHeader from "../components/PageHeader";
 import "./Scanner.css";
 import {
     CapacitorBarcodeScanner,
@@ -193,14 +194,7 @@ const Scanner: React.FC = () => {
 
     return (
         <IonPage>
-            <IonHeader>
-                <IonToolbar color='primary'>
-                    <IonButtons slot='start'>
-                        <IonBackButton defaultHref='/dashboard' />
-                    </IonButtons>
-                    <IonTitle>Aura Vision</IonTitle>
-                </IonToolbar>
-            </IonHeader>
+            <PageHeader title='Aura Vision' backHref='/dashboard' />
             <IonContent fullscreen className='scanner-content'>
                 {!scanning && !loading && (
                     <div className='scanner-idle'>

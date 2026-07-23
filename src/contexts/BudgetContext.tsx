@@ -41,15 +41,18 @@ const defaultCategories: CategoryBudget[] = [
     { id: "1", name: "", allocated: 0, spent: 0, color: "#3b82f6" },
 ];
 
+const calculateTotalBudget = (categories: CategoryBudget[]) =>
+    categories.reduce((sum, category) => sum + (category.allocated || 0), 0);
+
 export const BudgetProvider: React.FC<{ children: ReactNode }> = ({
     children,
 }) => {
     const { user } = useAuth();
     const [budget, setBudget] = useState<Budget>({
         id: "1",
-        weeklyBudget: 500,
+        weeklyBudget: calculateTotalBudget(defaultCategories),
         spent: 0,
-        remaining: 500,
+        remaining: calculateTotalBudget(defaultCategories),
         categories: defaultCategories,
     });
 
@@ -62,6 +65,113 @@ export const BudgetProvider: React.FC<{ children: ReactNode }> = ({
         savedAmount: 13500,
         currency: "£",
     });
+
+    // Cached asset prices (e.g. TSLA)
+    const [assetPrices, setAssetPrices] = useState<Record<string, number>>({});
+
+    const DEFAULT_ASSET_PRICE = 250; // fallback if API fails
+
+    const fetchAssetPrice = async (symbol: string) => {
+        try {
+            const apiUrl = import.meta.env.VITE_STOCK_API_URL;
+            const apiKey = import.meta.env.VITE_STOCK_API_KEY;
+
+            if (!apiUrl) {
+                // No API configured; use default
+                setAssetPrices((prev) => ({
+                    ...prev,
+                    [symbol]: DEFAULT_ASSET_PRICE,
+                }));
+                return DEFAULT_ASSET_PRICE;
+            }
+
+            // Expected API contract: GET ${apiUrl}?symbol=SYMBOL&apikey=KEY
+            const url = `${apiUrl}${
+                apiUrl.includes("?") ? "&" : "?"
+            }symbol=${encodeURIComponent(symbol)}${
+                apiKey ? `&apikey=${encodeURIComponent(apiKey)}` : ""
+            }`;
+
+            const resp = await axios.get(url);
+
+            // Try common shapes: resp.data.price, resp.data.currentPrice, resp.data[0].price
+            let price: number | undefined;
+            if (resp.data) {
+                // 1) Common direct numeric fields
+                if (typeof resp.data.price === "number")
+                    price = resp.data.price;
+                else if (typeof resp.data.currentPrice === "number")
+                    price = resp.data.currentPrice;
+                else if (
+                    Array.isArray(resp.data) &&
+                    resp.data[0] &&
+                    resp.data[0].price
+                )
+                    price = Number(resp.data[0].price);
+                else if (
+                    resp.data.data &&
+                    resp.data.data[0] &&
+                    resp.data.data[0].price
+                )
+                    price = Number(resp.data.data[0].price);
+
+                // 2) Alpha Vantage — wrapped Global Quote
+                if (
+                    (!price || Number.isNaN(price)) &&
+                    resp.data["Global Quote"]
+                ) {
+                    const gq = resp.data["Global Quote"];
+                    const priceField =
+                        gq["05. price"] || gq["05 price"] || gq.price;
+                    if (priceField !== undefined) price = Number(priceField);
+                }
+
+                // 3) Alpha Vantage — sometimes the response is the Global Quote object directly
+                if (
+                    (!price || Number.isNaN(price)) &&
+                    (resp.data["05. price"] || resp.data["05 price"])
+                ) {
+                    const pf = resp.data["05. price"] || resp.data["05 price"];
+                    price = Number(pf);
+                }
+
+                // 4) Fallback: scan keys for a price-like field (handles keys like '05. price')
+                if (!price || Number.isNaN(price)) {
+                    const keys = Object.keys(resp.data || {});
+                    for (const k of keys) {
+                        if (/price/i.test(k) || /\b05\D*price\b/i.test(k)) {
+                            const v = (resp.data as any)[k];
+                            const n = Number(v);
+                            if (!Number.isNaN(n)) {
+                                price = n;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                // 5) Last resort: pick first numeric value in response
+                if (!price || Number.isNaN(price)) {
+                    const candidate = Object.values(resp.data).find(
+                        (v) => typeof v === "number",
+                    );
+                    if (typeof candidate === "number") price = candidate;
+                }
+            }
+
+            const finalPrice =
+                price && !Number.isNaN(price) ? price : DEFAULT_ASSET_PRICE;
+            setAssetPrices((prev) => ({ ...prev, [symbol]: finalPrice }));
+            return finalPrice;
+        } catch (error) {
+            console.error("Error fetching asset price:", error);
+            setAssetPrices((prev) => ({
+                ...prev,
+                [symbol]: DEFAULT_ASSET_PRICE,
+            }));
+            return DEFAULT_ASSET_PRICE;
+        }
+    };
 
     // Fetch categories from API when user is authenticated
     useEffect(() => {
@@ -92,6 +202,15 @@ export const BudgetProvider: React.FC<{ children: ReactNode }> = ({
                     ...prevBudget,
                     categories:
                         categories.length > 0 ? categories : defaultCategories,
+                    weeklyBudget: calculateTotalBudget(
+                        categories.length > 0 ? categories : defaultCategories,
+                    ),
+                    remaining:
+                        calculateTotalBudget(
+                            categories.length > 0
+                                ? categories
+                                : defaultCategories,
+                        ) - prevBudget.spent,
                 }));
             } catch (error) {
                 console.error("Error fetching categories:", error);
@@ -262,15 +381,33 @@ export const BudgetProvider: React.FC<{ children: ReactNode }> = ({
     };
 
     const calculateImpactFactor = (amount: number): ImpactFactor => {
-        const percentageOfBudget = (amount / budget.remaining) * 100;
-        const remainingAfter = budget.remaining - amount;
+        const remaining = budget.remaining;
+        // Guard against division by zero or negative remaining
+        let percentageOfBudget: number;
+        if (remaining <= 0) {
+            percentageOfBudget = amount > 0 ? 100 : 0;
+        } else {
+            percentageOfBudget = (amount / remaining) * 100;
+        }
+
+        // Normalize NaN / infinite values
+        if (!isFinite(percentageOfBudget) || Number.isNaN(percentageOfBudget)) {
+            percentageOfBudget = amount > 0 ? 100 : 0;
+        }
+
+        const remainingAfter = remaining - amount;
 
         let warningLevel: "safe" | "caution" | "danger" = "safe";
-        if (percentageOfBudget > 50) {
+        if (remaining <= 0) {
+            warningLevel = "danger";
+        } else if (percentageOfBudget > 50) {
             warningLevel = "danger";
         } else if (percentageOfBudget > 25) {
             warningLevel = "caution";
         }
+
+        // Clamp percentage to reasonable range for UI
+        percentageOfBudget = Math.max(0, Math.min(percentageOfBudget, 100));
 
         return {
             amount,
@@ -283,14 +420,23 @@ export const BudgetProvider: React.FC<{ children: ReactNode }> = ({
     const calculateOpportunityCost = (
         productPrice: number,
     ): OpportunityCost => {
-        // Default asset: Tesla stock at ~$250
-        const teslaStockPrice = 250;
-        const equivalentUnits = productPrice / teslaStockPrice;
+        const symbol = "TSLA";
+        const assetPrice = assetPrices[symbol] || DEFAULT_ASSET_PRICE;
+
+        // If we don't have a fetched price yet, trigger background fetch
+        if (!assetPrices[symbol]) {
+            // fire-and-forget
+            fetchAssetPrice(symbol).catch(() => {
+                /* ignored */
+            });
+        }
+
+        const equivalentUnits = assetPrice > 0 ? productPrice / assetPrice : 0;
 
         return {
             productPrice,
             assetName: "Tesla Shares",
-            assetPrice: teslaStockPrice,
+            assetPrice,
             equivalentUnits: parseFloat(equivalentUnits.toFixed(2)),
         };
     };
@@ -325,6 +471,21 @@ export const BudgetProvider: React.FC<{ children: ReactNode }> = ({
                 categories: prevBudget.categories.map((cat) =>
                     cat.id === categoryId ? { ...cat, allocated: amount } : cat,
                 ),
+                weeklyBudget: calculateTotalBudget(
+                    prevBudget.categories.map((cat) =>
+                        cat.id === categoryId
+                            ? { ...cat, allocated: amount }
+                            : cat,
+                    ),
+                ),
+                remaining:
+                    calculateTotalBudget(
+                        prevBudget.categories.map((cat) =>
+                            cat.id === categoryId
+                                ? { ...cat, allocated: amount }
+                                : cat,
+                        ),
+                    ) - prevBudget.spent,
             }));
         } catch (error) {
             console.error("Error updating category budget:", error);
@@ -364,6 +525,15 @@ export const BudgetProvider: React.FC<{ children: ReactNode }> = ({
             setBudget((prevBudget) => ({
                 ...prevBudget,
                 categories: [...prevBudget.categories, newCategory],
+                weeklyBudget: calculateTotalBudget([
+                    ...prevBudget.categories,
+                    newCategory,
+                ]),
+                remaining:
+                    calculateTotalBudget([
+                        ...prevBudget.categories,
+                        newCategory,
+                    ]) - prevBudget.spent,
             }));
         } catch (error) {
             console.error("Error adding category:", error);

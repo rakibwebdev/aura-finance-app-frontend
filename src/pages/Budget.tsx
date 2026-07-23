@@ -1,11 +1,6 @@
 import {
     IonPage,
-    IonHeader,
-    IonToolbar,
-    IonTitle,
     IonContent,
-    IonButtons,
-    IonBackButton,
     IonCard,
     IonCardHeader,
     IonCardTitle,
@@ -19,10 +14,15 @@ import {
     IonModal,
     IonLoading,
     useIonToast,
+    IonHeader,
+    IonToolbar,
+    IonTitle,
+    IonButtons,
 } from "@ionic/react";
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useBudget } from "../contexts/BudgetContext";
 import { save, add } from "ionicons/icons";
+import PageHeader from "../components/PageHeader";
 
 function Budget() {
     const { budget, updateCategoryBudget, addCategory } = useBudget();
@@ -144,14 +144,7 @@ function Budget() {
 
     return (
         <IonPage>
-            <IonHeader>
-                <IonToolbar color='primary'>
-                    <IonButtons slot='start'>
-                        <IonBackButton defaultHref='/dashboard' />
-                    </IonButtons>
-                    <IonTitle>Budget Settings</IonTitle>
-                </IonToolbar>
-            </IonHeader>
+            <PageHeader title='Budget Settings' backHref='/dashboard' />
             <IonContent fullscreen>
                 <div style={{ padding: "16px" }}>
                     <IonCard>

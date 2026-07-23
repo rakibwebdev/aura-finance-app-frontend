@@ -111,7 +111,7 @@ const DreamVisualizer: React.FC<{ goal: Goal }> = ({ goal }) => {
                                 : "medium"
                         }
                     >
-                        {percent}%
+                        {percent}% of {goal.targetAmount.toLocaleString()}
                     </IonBadge>
                 </div>
 

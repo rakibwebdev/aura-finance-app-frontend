@@ -17,7 +17,7 @@ public class GoalARPlugin: CAPPlugin, CAPBridgedPlugin {
         let progress   = call.getFloat("progress")   ?? 0.0
         let goalID     = call.getString("goalID")    ?? "default"
         let anchorID   = call.getString("anchorID")
-        let modelSize  = call.getFloat("modelSize")  ?? 0.5  // ← added
+        let modelSize  = call.getFloat("modelSize")  ?? 0.18
 
         let status = AVCaptureDevice.authorizationStatus(for: .video)
 

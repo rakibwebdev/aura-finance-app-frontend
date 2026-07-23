@@ -15,6 +15,14 @@ interface OpportunityCostDisplayProps {
 const OpportunityCostDisplay: React.FC<OpportunityCostDisplayProps> = ({
     opportunityCost,
 }) => {
+    const annualReturnRate = 0.1;
+    const projectionYears = 5;
+    const projectedAssetPrice =
+        opportunityCost.assetPrice *
+        Math.pow(1 + annualReturnRate, projectionYears);
+    const projectedValue =
+        opportunityCost.equivalentUnits * projectedAssetPrice;
+
     return (
         <IonCard className='opportunity-card'>
             <IonCardHeader>
@@ -36,6 +44,15 @@ const OpportunityCostDisplay: React.FC<OpportunityCostDisplayProps> = ({
                         giving up the potential for future wealth growth by
                         spending this money today.
                     </p>
+                    <p className='opportunity-explanation'>
+                        Assuming a {Math.round(annualReturnRate * 100)}% annual
+                        return over {projectionYears} years.
+                    </p>
+                    <p className='opportunity-explanation'>
+                        TSLA price now: ${opportunityCost.assetPrice.toFixed(2)}
+                        . Projected TSLA price in {projectionYears} years: $
+                        {projectedAssetPrice.toFixed(2)}.
+                    </p>
                     <div className='opportunity-comparison'>
                         <div className='comparison-item'>
                             <span className='comparison-label'>
@@ -51,10 +68,7 @@ const OpportunityCostDisplay: React.FC<OpportunityCostDisplayProps> = ({
                                 Potential Value (5yr)
                             </span>
                             <span className='comparison-value potential'>
-                                $
-                                {(opportunityCost.productPrice * 1.5).toFixed(
-                                    2,
-                                )}
+                                ${projectedValue.toFixed(2)}
                             </span>
                         </div>
                     </div>

@@ -10,7 +10,7 @@ class GoalARViewController: UIViewController, ARSessionDelegate, UIGestureRecogn
     var progress: Float   = 0.0
     var goalID: String    = ""
     var anchorID: String? = nil
-    var modelSize: Float  = 0.5
+    var modelSize: Float  = 0.18
     var onDone: ((String) -> Void)?
 
     private var arView:             ARView!
