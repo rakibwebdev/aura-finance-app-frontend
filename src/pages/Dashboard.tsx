@@ -1,4 +1,5 @@
 import React from "react";
+import { useState } from "react";
 import {
     IonPage,
     IonContent,
@@ -14,14 +15,20 @@ import {
     IonGrid,
     IonRow,
     IonCol,
+    IonButton,
+    useIonToast,
+    isPlatform,
 } from "@ionic/react";
 import { useBudget } from "../contexts/BudgetContext";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend } from "recharts";
 import PageHeader from "../components/PageHeader";
+import { runGoalARLatencyBenchmark } from "../plugin/ARPlugin";
 import "./Dashboard.css";
 
 const Dashboard: React.FC = () => {
     const { budget, transactions } = useBudget();
+    const [presentToast] = useIonToast();
+    const [isRunningBenchmark, setIsRunningBenchmark] = useState(false);
 
     const totalBudget = budget.categories.reduce(
         (sum, category) => sum + (category.allocated || 0),
@@ -37,6 +44,45 @@ const Dashboard: React.FC = () => {
         value: cat.spent || 0.1, // Minimum value for visibility
         color: cat.color,
     }));
+
+    const handleRunLatencyBenchmark = async () => {
+        if (!isPlatform("ios")) {
+            await presentToast({
+                message: "Latency benchmark is only available on iOS.",
+                duration: 2000,
+                color: "warning",
+                position: "bottom",
+            });
+            return;
+        }
+
+        setIsRunningBenchmark(true);
+
+        try {
+            const result = await runGoalARLatencyBenchmark(25);
+
+            console.log("GoalAR latency benchmark:", result);
+
+            await presentToast({
+                message: `Avg ${result.averageRoundTripLatency.toFixed(
+                    2,
+                )} ms | Peak ${result.peakRoundTripLatency.toFixed(2)} ms`,
+                duration: 3500,
+                color: "success",
+                position: "bottom",
+            });
+        } catch (error) {
+            console.error("Latency benchmark failed:", error);
+            await presentToast({
+                message: "Latency benchmark failed. Check the console.",
+                duration: 2500,
+                color: "danger",
+                position: "bottom",
+            });
+        } finally {
+            setIsRunningBenchmark(false);
+        }
+    };
 
     return (
         <IonPage>
@@ -71,6 +117,27 @@ const Dashboard: React.FC = () => {
                                 <p>${totalBudget.toFixed(2)}</p>
                             </div>
                         </div>
+                    </IonCardContent>
+                </IonCard>
+
+                <IonCard className='benchmark-card'>
+                    <IonCardHeader>
+                        <IonCardTitle>Bridge Latency Test</IonCardTitle>
+                    </IonCardHeader>
+                    <IonCardContent>
+                        <p className='benchmark-copy'>
+                            Run the native bridge benchmark to measure payload
+                            latency and round-trip time.
+                        </p>
+                        <IonButton
+                            expand='block'
+                            onClick={handleRunLatencyBenchmark}
+                            disabled={isRunningBenchmark}
+                        >
+                            {isRunningBenchmark
+                                ? "Running Benchmark..."
+                                : "Run Latency Benchmark"}
+                        </IonButton>
                     </IonCardContent>
                 </IonCard>
 

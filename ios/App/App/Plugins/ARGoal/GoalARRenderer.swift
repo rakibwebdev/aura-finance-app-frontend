@@ -6,6 +6,8 @@ class GoalARRenderer {
 
     private weak var arView: ARView?
     private var modelEntity: ModelEntity?
+    private let minimumScale: Float = 0.035
+    private let maximumScale: Float = 0.22
 
     init(arView: ARView) {
         self.arView = arView
@@ -29,7 +31,8 @@ class GoalARRenderer {
             let model = try ModelEntity.loadModel(named: name)
             print("Model loaded: \(name)")
 
-            scaleModelToFit(model: model, desiredSize: size)
+            let responsiveSize = responsiveDesiredSize(baseSize: size)
+            scaleModelToFit(model: model, desiredSize: responsiveSize)
             applyProgress(to: model, progress: progress)
             anchor.addChild(model)
             self.modelEntity = model
@@ -66,11 +69,22 @@ class GoalARRenderer {
         print("Scale applied: \(scale) to fit \(desiredSize)m")
     }
 
+    private func responsiveDesiredSize(baseSize: Float) -> Float {
+        guard let arView = arView else { return baseSize }
+
+        let shortestSide = Float(min(arView.bounds.width, arView.bounds.height))
+        let normalizedScreenSize = max(0.0, min(1.0, shortestSide / 900.0))
+        let responsiveFloor = 0.08 + (normalizedScreenSize * 0.07)
+        let responsiveCeiling = 0.12 + (normalizedScreenSize * 0.10)
+
+        return max(responsiveFloor, min(baseSize, responsiveCeiling))
+    }
+
     func resizeModel(by scaleFactor: Float) {
         guard let model = modelEntity else { return }
 
         let currentScale = (model.scale.x + model.scale.y + model.scale.z) / 3.0
-        let nextScale = max(0.05, min(currentScale * scaleFactor, 0.35))
+        let nextScale = max(minimumScale, min(currentScale * scaleFactor, maximumScale))
 
         model.scale = SIMD3<Float>(repeating: nextScale)
     }

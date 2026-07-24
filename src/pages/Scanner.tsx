@@ -122,11 +122,17 @@ const Scanner: React.FC = () => {
                 stopScan();
                 await fetchProductByBarcode(result.ScanResult);
             }
-        } catch (error) {
+        } catch (error: unknown) {
             console.error("Scan error:", error);
 
+            const errorObject =
+                typeof error === "object" && error !== null
+                    ? (error as { message?: string; code?: string })
+                    : null;
             const errorMessage =
-                error instanceof Error ? error.message : String(error);
+                errorObject?.message ||
+                (error instanceof Error ? error.message : String(error));
+            const errorCode = errorObject?.code;
             const shouldFallbackToWebScanner =
                 !isWebPlatform && /not implemented/i.test(errorMessage);
 
@@ -148,7 +154,28 @@ const Scanner: React.FC = () => {
                 }
             }
 
-            setError("Failed to start scanner: " + errorMessage);
+            if (errorCode === "OS-PLUG-BARC-0007") {
+                setError(
+                    "Camera access denied. Enable camera permission in iOS Settings > Aura Finance.",
+                );
+            } else if (errorCode === "UNIMPLEMENTED") {
+                setError(
+                    "Barcode plugin is not linked in the iOS target. In Xcode, add the local package ios/App/CapApp-SPM to the App target, then rebuild.",
+                );
+            } else if (errorCode === "OS-PLUG-BARC-0006") {
+                setError("Scanner was cancelled.");
+            } else if (errorCode === "OS-PLUG-BARC-0004") {
+                setError(
+                    "iOS scanner failed to start. If you are on Simulator, test on a physical iPhone.",
+                );
+            } else {
+                setError(
+                    `Failed to start scanner${
+                        errorCode ? ` (${errorCode})` : ""
+                    }: ${errorMessage}`,
+                );
+            }
+
             stopScan();
         }
     };

@@ -1,6 +1,7 @@
 import UIKit
 import ARKit
 import RealityKit
+import Darwin
 
 class GoalARViewController: UIViewController, ARSessionDelegate, UIGestureRecognizerDelegate {
 
@@ -19,6 +20,8 @@ class GoalARViewController: UIViewController, ARSessionDelegate, UIGestureRecogn
     private var isRestoringFromSave = false
     private var statusLabel:        UILabel?
     private var lastRotationValue:  CGFloat = 0
+    private var diagnosticsTimer:   Timer?
+    private var controlsContainer:  UIStackView?
 
     // MARK: - Lifecycle
 
@@ -45,6 +48,19 @@ class GoalARViewController: UIViewController, ARSessionDelegate, UIGestureRecogn
             updateStatusLabel("Move phone slowly to scan floor, then tap")
             startSession(with: nil)
         }
+
+        startDiagnosticsMonitoring()
+    }
+
+    deinit {
+        diagnosticsTimer?.invalidate()
+        print("[ARDiagnostics] GoalARViewController deinitialized")
+    }
+
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        diagnosticsTimer?.invalidate()
+        diagnosticsTimer = nil
     }
 
     // MARK: - AR Session
@@ -60,6 +76,65 @@ class GoalARViewController: UIViewController, ARSessionDelegate, UIGestureRecogn
         } else {
             arView.session.run(config, options: [.resetTracking, .removeExistingAnchors])
         }
+    }
+
+    private func startDiagnosticsMonitoring() {
+        diagnosticsTimer?.invalidate()
+        logDiagnostics(event: "startup")
+
+        diagnosticsTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
+            self?.logDiagnostics(event: "periodic")
+        }
+    }
+
+    private func logDiagnostics(event: String) {
+        let memoryMB = currentResidentMemoryMB()
+        let thermalState = ProcessInfo.processInfo.thermalState
+        let thermalLabel: String
+
+        switch thermalState {
+        case .nominal:
+            thermalLabel = "nominal"
+        case .fair:
+            thermalLabel = "fair"
+        case .serious:
+            thermalLabel = "serious"
+        case .critical:
+            thermalLabel = "critical"
+        @unknown default:
+            thermalLabel = "unknown"
+        }
+
+        print(String(
+            format: "[ARDiagnostics] %@ | memory: %.1f MB | thermal: %@",
+            event,
+            memoryMB,
+            thermalLabel
+        ))
+    }
+
+    private func currentResidentMemoryMB() -> Double {
+        var info = task_vm_info_data_t()
+        var count = mach_msg_type_number_t(
+            MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<natural_t>.size
+        )
+
+        let result = withUnsafeMutablePointer(to: &info) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { pointer in
+                task_info(
+                    mach_task_self_,
+                    task_flavor_t(TASK_VM_INFO),
+                    pointer,
+                    &count
+                )
+            }
+        }
+
+        guard result == KERN_SUCCESS else {
+            return 0.0
+        }
+
+        return Double(info.phys_footprint) / 1_048_576.0
     }
 
     // MARK: - ARSessionDelegate
@@ -129,6 +204,7 @@ class GoalARViewController: UIViewController, ARSessionDelegate, UIGestureRecogn
             hasPlacedModel      = true
             isRestoringFromSave = false
             updateStatusLabel("Goal restored!")
+            setControlsVisible(true)
             onDone?(anchor.identifier.uuidString)
         } else {
             print("No saved anchor found — falling back to fresh placement")
@@ -197,6 +273,7 @@ class GoalARViewController: UIViewController, ARSessionDelegate, UIGestureRecogn
 
         hasPlacedModel = true
         updateStatusLabel("Pinch to resize, rotate with two fingers")
+        setControlsVisible(true)
 
         saveWorldMap(for: goalID) {
             self.updateStatusLabel("Goal placed and saved!")
@@ -300,6 +377,21 @@ class GoalARViewController: UIViewController, ARSessionDelegate, UIGestureRecogn
         closeBtn.addTarget(self, action: #selector(close), for: .touchUpInside)
         view.addSubview(closeBtn)
 
+        let zoomOutBtn = makeControlButton(title: "Zoom -", action: #selector(zoomOutTapped))
+        let zoomInBtn = makeControlButton(title: "Zoom +", action: #selector(zoomInTapped))
+        let rotateLeftBtn = makeControlButton(title: "Rotate ⟲", action: #selector(rotateLeftTapped))
+        let rotateRightBtn = makeControlButton(title: "Rotate ⟳", action: #selector(rotateRightTapped))
+
+        let controls = UIStackView(arrangedSubviews: [zoomOutBtn, zoomInBtn, rotateLeftBtn, rotateRightBtn])
+        controls.axis = .horizontal
+        controls.alignment = .fill
+        controls.distribution = .fillEqually
+        controls.spacing = 8
+        controls.translatesAutoresizingMaskIntoConstraints = false
+        controls.isHidden = true
+        view.addSubview(controls)
+        self.controlsContainer = controls
+
         let tap = UITapGestureRecognizer(target: self, action: #selector(onTap))
         tap.delegate = self
         arView.addGestureRecognizer(tap)
@@ -328,7 +420,49 @@ class GoalARViewController: UIViewController, ARSessionDelegate, UIGestureRecogn
                 constant: -16),
             closeBtn.widthAnchor.constraint(equalToConstant: 80),
             closeBtn.heightAnchor.constraint(equalToConstant: 32),
+
+            controls.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+            controls.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+            controls.bottomAnchor.constraint(equalTo: status.topAnchor, constant: -12),
+            controls.heightAnchor.constraint(equalToConstant: 38),
         ])
+    }
+
+    private func makeControlButton(title: String, action: Selector) -> UIButton {
+        let button = UIButton(type: .system)
+        button.setTitle(title, for: .normal)
+        button.setTitleColor(.white, for: .normal)
+        button.titleLabel?.font = .systemFont(ofSize: 13, weight: .semibold)
+        button.backgroundColor = UIColor.black.withAlphaComponent(0.55)
+        button.layer.cornerRadius = 10
+        button.addTarget(self, action: action, for: .touchUpInside)
+        return button
+    }
+
+    private func setControlsVisible(_ visible: Bool) {
+        DispatchQueue.main.async {
+            self.controlsContainer?.isHidden = !visible
+        }
+    }
+
+    @objc private func zoomInTapped() {
+        guard hasPlacedModel else { return }
+        renderer.resizeModel(by: 1.08)
+    }
+
+    @objc private func zoomOutTapped() {
+        guard hasPlacedModel else { return }
+        renderer.resizeModel(by: 0.92)
+    }
+
+    @objc private func rotateLeftTapped() {
+        guard hasPlacedModel else { return }
+        renderer.rotateModel(by: -.pi / 16)
+    }
+
+    @objc private func rotateRightTapped() {
+        guard hasPlacedModel else { return }
+        renderer.rotateModel(by: .pi / 16)
     }
 
     func updateStatusLabel(_ text: String) {

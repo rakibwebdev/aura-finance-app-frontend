@@ -8,6 +8,22 @@
     margin: 16px;
 }
 
+.benchmark-card {
+    background: linear-gradient(135deg, #111827 0%, #1f2937 100%);
+    color: #e5e7eb;
+}
+
+.benchmark-card ion-card-title {
+    color: #f9fafb;
+}
+
+.benchmark-copy {
+    margin-top: 0;
+    margin-bottom: 16px;
+    color: #cbd5e1;
+    line-height: 1.5;
+}
+
 .safe-to-spend-card ion-card-title {
     color: white;
     font-size: 14px;

@@ -10,6 +10,7 @@ public class GoalARPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "startGoalAR",    returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "updateProgress", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "resetAnchor",    returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "measureLatency", returnType: CAPPluginReturnPromise),
     ]
 
     @objc func startGoalAR(_ call: CAPPluginCall) {
@@ -65,6 +66,35 @@ public class GoalARPlugin: CAPPlugin, CAPBridgedPlugin {
         let url    = docs.appendingPathComponent("worldmap_\(goalID).arexperience")
         try? FileManager.default.removeItem(at: url)
         call.resolve()
+    }
+
+    @objc func measureLatency(_ call: CAPPluginCall) {
+        let sentAt = call.getDouble("sentAt") ?? 0.0
+        let sequence = call.getInt("sequence") ?? 0
+        let payload = call.getString("payload") ?? "{}"
+        let receivedAt = Date().timeIntervalSince1970 * 1000.0
+
+        let payloadBytes = payload.utf8.count
+        let parsedKeys: Int
+
+        if let data = payload.data(using: .utf8),
+           let object = try? JSONSerialization.jsonObject(with: data),
+           let dictionary = object as? [String: Any] {
+            parsedKeys = dictionary.count
+        } else {
+            parsedKeys = 0
+        }
+
+        let processedAt = Date().timeIntervalSince1970 * 1000.0
+
+        call.resolve([
+            "sequence": sequence,
+            "sentAt": sentAt,
+            "receivedAt": receivedAt,
+            "processedAt": processedAt,
+            "payloadBytes": payloadBytes,
+            "parsedKeys": parsedKeys,
+        ])
     }
 
     private func presentAR(modelName: String, progress: Float,

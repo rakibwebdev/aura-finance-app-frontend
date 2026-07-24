@@ -26,11 +26,8 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
-    <key>NSCameraUsageDescription</key>
-    <string>Aura Finance needs camera access for AR features</string>
-
-    <key>NSCameraUsageDescription</key>
-    <string>Aura Finance needs camera access for AR features</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Aura Finance needs camera access to scan product barcodes and support AR features.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
