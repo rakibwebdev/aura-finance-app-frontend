@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
     IonPage,
     IonContent,
@@ -7,7 +7,6 @@ import {
     IonCardContent,
     IonCardHeader,
     IonCardTitle,
-    IonBackButton,
     IonButtons,
     IonModal,
     IonList,
@@ -36,6 +35,64 @@ import {
 import { CapacitorBarcodeScannerWeb } from "@capacitor/barcode-scanner/dist/esm/web";
 import axios from "axios";
 
+const IS_WEB_PLATFORM = Capacitor.getPlatform() === "web";
+
+const BARCODE_SCAN_OPTIONS = {
+    hint: CapacitorBarcodeScannerTypeHintALLOption.ALL,
+    cameraDirection: CapacitorBarcodeScannerCameraDirection.BACK,
+};
+
+const UNCATEGORIZED = "Uncategorized";
+
+const ERROR_CODE_MESSAGES: Record<string, string> = {
+    "OS-PLUG-BARC-0007":
+        "Camera access denied. Enable camera permission in iOS Settings > Aura Finance.",
+    UNIMPLEMENTED:
+        "Barcode plugin is not linked in the iOS target. In Xcode, add the local package ios/App/CapApp-SPM to the App target, then rebuild.",
+    "OS-PLUG-BARC-0006": "Scanner was cancelled.",
+    "OS-PLUG-BARC-0004":
+        "iOS scanner failed to start. If you are on Simulator, test on a physical iPhone.",
+};
+
+interface ScannedProduct {
+    barcode: string;
+    name: string;
+    price: number;
+}
+
+interface ProductApiResponse {
+    data: {
+        barcode: string;
+        name: string;
+        price: number;
+    };
+}
+
+function parseScanError(error: unknown): { message: string; code?: string } {
+    const errorObject =
+        typeof error === "object" && error !== null
+            ? (error as { message?: string; code?: string })
+            : null;
+
+    const message =
+        errorObject?.message ??
+        (error instanceof Error ? error.message : String(error));
+
+    return { message, code: errorObject?.code };
+}
+
+function getErrorMessage(
+    code: string | undefined,
+    fallbackMessage: string,
+): string {
+    if (code && ERROR_CODE_MESSAGES[code]) {
+        return ERROR_CODE_MESSAGES[code];
+    }
+    return `Failed to start scanner${
+        code ? ` (${code})` : ""
+    }: ${fallbackMessage}`;
+}
+
 const Scanner: React.FC = () => {
     const {
         calculateImpactFactor,
@@ -43,40 +100,39 @@ const Scanner: React.FC = () => {
         addTransaction,
         budget,
     } = useBudget();
+
     const [scanning, setScanning] = useState(false);
     const [loading, setLoading] = useState(false);
-    const [scannedProduct, setScannedProduct] = useState<{
-        barcode: string;
-        name: string;
-        price: number;
-    } | null>(null);
+    const [scannedProduct, setScannedProduct] = useState<ScannedProduct | null>(
+        null,
+    );
     const [showModal, setShowModal] = useState(false);
     const [error, setError] = useState("");
     const [selectedCategoryId, setSelectedCategoryId] = useState<string>("");
 
-    const isWebPlatform = Capacitor.getPlatform() === "web";
-    const barcodeScanOptions = {
-        hint: CapacitorBarcodeScannerTypeHintALLOption.ALL,
-        cameraDirection: CapacitorBarcodeScannerCameraDirection.BACK,
-    };
+    useEffect(() => {
+        return () => {
+            document.body.classList.remove("scanner-active");
+        };
+    }, []);
 
-    const scanBarcodeOnWeb = async () => {
+    const scanBarcodeOnWeb = useCallback(async () => {
         const webScanner = new CapacitorBarcodeScannerWeb();
         return webScanner.scanBarcode({
-            ...barcodeScanOptions,
+            ...BARCODE_SCAN_OPTIONS,
             web: {
                 showCameraSelection: false,
                 scannerFPS: 30,
             },
         });
-    };
+    }, []);
 
-    const fetchProductByBarcode = async (barcode: string) => {
+    const fetchProductByBarcode = useCallback(async (barcode: string) => {
         try {
             setLoading(true);
             setError("");
 
-            const response = await axios.get(
+            const response = await axios.get<ProductApiResponse>(
                 `${import.meta.env.VITE_API_URL}/api/products/${barcode}`,
             );
 
@@ -87,18 +143,14 @@ const Scanner: React.FC = () => {
                 name: product.name,
                 price: product.price,
             });
-
             setShowModal(true);
         } catch (err) {
             console.error("Error fetching product:", err);
+
             if (axios.isAxiosError(err) && err.response?.status === 404) {
                 setError("Product not found. Please enter details manually.");
-                // Show modal with empty product for manual entry
-                setScannedProduct({
-                    barcode: barcode,
-                    name: "",
-                    price: 0,
-                });
+
+                setScannedProduct({ barcode, name: "", price: 0 });
                 setShowModal(true);
             } else {
                 setError("Failed to fetch product. Please try again.");
@@ -106,45 +158,43 @@ const Scanner: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
 
-    const startScan = async () => {
+    const stopScan = useCallback(() => {
+        setScanning(false);
+        document.body.classList.remove("scanner-active");
+    }, []);
+
+    const startScan = useCallback(async () => {
+        setScanning(true);
+        setError("");
+        document.body.classList.add("scanner-active");
+
         try {
-            setScanning(true);
-            setError("");
-            document.body.classList.add("scanner-active");
-
-            const result = isWebPlatform
+            const result = IS_WEB_PLATFORM
                 ? await scanBarcodeOnWeb()
-                : await CapacitorBarcodeScanner.scanBarcode(barcodeScanOptions);
+                : await CapacitorBarcodeScanner.scanBarcode(
+                      BARCODE_SCAN_OPTIONS,
+                  );
 
             if (result.ScanResult) {
                 stopScan();
                 await fetchProductByBarcode(result.ScanResult);
             }
-        } catch (error: unknown) {
-            console.error("Scan error:", error);
+        } catch (err: unknown) {
+            console.error("Scan error:", err);
 
-            const errorObject =
-                typeof error === "object" && error !== null
-                    ? (error as { message?: string; code?: string })
-                    : null;
-            const errorMessage =
-                errorObject?.message ||
-                (error instanceof Error ? error.message : String(error));
-            const errorCode = errorObject?.code;
+            const { message, code } = parseScanError(err);
             const shouldFallbackToWebScanner =
-                !isWebPlatform && /not implemented/i.test(errorMessage);
+                !IS_WEB_PLATFORM && /not implemented/i.test(message);
 
             if (shouldFallbackToWebScanner) {
                 try {
                     const fallbackResult = await scanBarcodeOnWeb();
-
                     if (fallbackResult.ScanResult) {
                         stopScan();
                         await fetchProductByBarcode(fallbackResult.ScanResult);
                     }
-
                     return;
                 } catch (fallbackError) {
                     console.error(
@@ -154,70 +204,59 @@ const Scanner: React.FC = () => {
                 }
             }
 
-            if (errorCode === "OS-PLUG-BARC-0007") {
-                setError(
-                    "Camera access denied. Enable camera permission in iOS Settings > Aura Finance.",
-                );
-            } else if (errorCode === "UNIMPLEMENTED") {
-                setError(
-                    "Barcode plugin is not linked in the iOS target. In Xcode, add the local package ios/App/CapApp-SPM to the App target, then rebuild.",
-                );
-            } else if (errorCode === "OS-PLUG-BARC-0006") {
-                setError("Scanner was cancelled.");
-            } else if (errorCode === "OS-PLUG-BARC-0004") {
-                setError(
-                    "iOS scanner failed to start. If you are on Simulator, test on a physical iPhone.",
-                );
-            } else {
-                setError(
-                    `Failed to start scanner${
-                        errorCode ? ` (${errorCode})` : ""
-                    }: ${errorMessage}`,
-                );
-            }
-
+            setError(getErrorMessage(code, message));
             stopScan();
         }
-    };
+    }, [fetchProductByBarcode, scanBarcodeOnWeb, stopScan]);
 
-    const stopScan = () => {
-        setScanning(false);
-        document.body.classList.remove("scanner-active");
-    };
-
-    const confirmPurchase = () => {
-        if (scannedProduct) {
-            // Validate fields
-            if (!scannedProduct.name || scannedProduct.price <= 0) {
-                setError("Please enter valid product name and price");
-                return;
-            }
-
-            // Find selected category to get its name
-            const selectedCategory = budget.categories.find(
-                (cat) => cat.id === selectedCategoryId,
+    const updateScannedProductField = useCallback(
+        <K extends keyof ScannedProduct>(
+            field: K,
+            value: ScannedProduct[K],
+        ) => {
+            setScannedProduct((prev) =>
+                prev ? { ...prev, [field]: value } : prev,
             );
+        },
+        [],
+    );
 
-            addTransaction({
-                name: scannedProduct.name,
-                amount: scannedProduct.price,
-                category: selectedCategory?.name || "Uncategorized",
-                categoryId: selectedCategoryId || undefined,
-                barcode: scannedProduct.barcode,
-            });
-            setShowModal(false);
-            setScannedProduct(null);
-            setSelectedCategoryId("");
-            setError("");
-        }
-    };
-
-    const cancelPurchase = () => {
+    const resetModalState = useCallback(() => {
         setShowModal(false);
         setScannedProduct(null);
         setSelectedCategoryId("");
         setError("");
-    };
+    }, []);
+
+    const confirmPurchase = useCallback(() => {
+        if (!scannedProduct) return;
+
+        const trimmedName = scannedProduct.name.trim();
+        if (!trimmedName || scannedProduct.price <= 0) {
+            setError("Please enter valid product name and price");
+            return;
+        }
+
+        const selectedCategory = budget.categories.find(
+            (cat) => cat.id === selectedCategoryId,
+        );
+
+        addTransaction({
+            name: trimmedName,
+            amount: scannedProduct.price,
+            category: selectedCategory?.name ?? UNCATEGORIZED,
+            categoryId: selectedCategoryId || undefined,
+            barcode: scannedProduct.barcode,
+        });
+
+        resetModalState();
+    }, [
+        scannedProduct,
+        selectedCategoryId,
+        budget.categories,
+        addTransaction,
+        resetModalState,
+    ]);
 
     return (
         <IonPage>
@@ -286,7 +325,6 @@ const Scanner: React.FC = () => {
                     </div>
                 )}
 
-                {/* Loading State */}
                 {loading && (
                     <div className='scanner-loading'>
                         <IonSpinner name='crescent' />
@@ -294,7 +332,6 @@ const Scanner: React.FC = () => {
                     </div>
                 )}
 
-                {/* Scanning Overlay */}
                 {scanning && (
                     <div className='scanner-overlay'>
                         <div className='scan-region'>
@@ -311,13 +348,12 @@ const Scanner: React.FC = () => {
                     </div>
                 )}
 
-                {/* Product Analysis Modal */}
-                <IonModal isOpen={showModal} onDidDismiss={cancelPurchase}>
+                <IonModal isOpen={showModal} onDidDismiss={resetModalState}>
                     <IonHeader>
                         <IonToolbar color='primary'>
                             <IonTitle>Purchase Analysis</IonTitle>
                             <IonButtons slot='end'>
-                                <IonButton onClick={cancelPurchase}>
+                                <IonButton onClick={resetModalState}>
                                     Close
                                 </IonButton>
                             </IonButtons>
@@ -351,13 +387,12 @@ const Scanner: React.FC = () => {
                                             </IonLabel>
                                             <IonInput
                                                 value={scannedProduct.barcode}
-                                                disabled={!isWebPlatform}
+                                                disabled={!IS_WEB_PLATFORM}
                                                 onIonInput={(e) =>
-                                                    setScannedProduct({
-                                                        ...scannedProduct,
-                                                        barcode:
-                                                            e.detail.value!,
-                                                    })
+                                                    updateScannedProductField(
+                                                        "barcode",
+                                                        e.detail.value ?? "",
+                                                    )
                                                 }
                                             />
                                         </IonItem>
@@ -368,10 +403,10 @@ const Scanner: React.FC = () => {
                                             <IonInput
                                                 value={scannedProduct.name}
                                                 onIonInput={(e) =>
-                                                    setScannedProduct({
-                                                        ...scannedProduct,
-                                                        name: e.detail.value!,
-                                                    })
+                                                    updateScannedProductField(
+                                                        "name",
+                                                        e.detail.value ?? "",
+                                                    )
                                                 }
                                                 placeholder='Enter product name'
                                             />
@@ -384,13 +419,13 @@ const Scanner: React.FC = () => {
                                                 type='number'
                                                 value={scannedProduct.price}
                                                 onIonInput={(e) =>
-                                                    setScannedProduct({
-                                                        ...scannedProduct,
-                                                        price:
-                                                            parseFloat(
-                                                                e.detail.value!,
-                                                            ) || 0,
-                                                    })
+                                                    updateScannedProductField(
+                                                        "price",
+                                                        parseFloat(
+                                                            e.detail.value ??
+                                                                "",
+                                                        ) || 0,
+                                                    )
                                                 }
                                                 placeholder='Enter price'
                                             />
@@ -428,7 +463,6 @@ const Scanner: React.FC = () => {
                                                 scannedProduct.price,
                                             )}
                                         />
-
                                         <OpportunityCostDisplay
                                             opportunityCost={calculateOpportunityCost(
                                                 scannedProduct.price,
@@ -441,7 +475,7 @@ const Scanner: React.FC = () => {
                                     <IonButton
                                         expand='block'
                                         color='danger'
-                                        onClick={cancelPurchase}
+                                        onClick={resetModalState}
                                         className='cancel-button'
                                     >
                                         Don't Buy
