@@ -14,7 +14,6 @@
     },
     "dependencies": {
         "@capacitor/app": "8.0.0",
-        "@capacitor/barcode-scanner": "^3.0.2",
         "@capacitor/core": "8.0.2",
         "@capacitor/haptics": "8.0.0",
         "@capacitor/ios": "8.0.2",
@@ -30,6 +29,7 @@
         "@types/react-router-dom": "^5.3.3",
         "ar-plugin": "file:src/ar-plugin",
         "axios": "^1.13.5",
+        "html5-qrcode": "^2.3.8",
         "ionicons": "^7.4.0",
         "react": "19.0.0",
         "react-dom": "19.0.0",

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import {
     IonPage,
     IonContent,
@@ -21,38 +21,17 @@ import {
     IonToolbar,
     IonTitle,
 } from "@ionic/react";
-import { Capacitor } from "@capacitor/core";
 import { useBudget } from "../contexts/BudgetContext";
 import ImpactDisplay from "../components/ImpactDisplay";
 import OpportunityCostDisplay from "../components/OpportunityCostDisplay";
 import PageHeader from "../components/PageHeader";
 import "./Scanner.css";
-import {
-    CapacitorBarcodeScanner,
-    CapacitorBarcodeScannerCameraDirection,
-    CapacitorBarcodeScannerTypeHintALLOption,
-} from "@capacitor/barcode-scanner";
-import { CapacitorBarcodeScannerWeb } from "@capacitor/barcode-scanner/dist/esm/web";
+
+// Import the new JS Scanner
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 import axios from "axios";
 
-const IS_WEB_PLATFORM = Capacitor.getPlatform() === "web";
-
-const BARCODE_SCAN_OPTIONS = {
-    hint: CapacitorBarcodeScannerTypeHintALLOption.ALL,
-    cameraDirection: CapacitorBarcodeScannerCameraDirection.BACK,
-};
-
 const UNCATEGORIZED = "Uncategorized";
-
-const ERROR_CODE_MESSAGES: Record<string, string> = {
-    "OS-PLUG-BARC-0007":
-        "Camera access denied. Enable camera permission in iOS Settings > Aura Finance.",
-    UNIMPLEMENTED:
-        "Barcode plugin is not linked in the iOS target. In Xcode, add the local package ios/App/CapApp-SPM to the App target, then rebuild.",
-    "OS-PLUG-BARC-0006": "Scanner was cancelled.",
-    "OS-PLUG-BARC-0004":
-        "iOS scanner failed to start. If you are on Simulator, test on a physical iPhone.",
-};
 
 interface ScannedProduct {
     barcode: string;
@@ -66,31 +45,6 @@ interface ProductApiResponse {
         name: string;
         price: number;
     };
-}
-
-function parseScanError(error: unknown): { message: string; code?: string } {
-    const errorObject =
-        typeof error === "object" && error !== null
-            ? (error as { message?: string; code?: string })
-            : null;
-
-    const message =
-        errorObject?.message ??
-        (error instanceof Error ? error.message : String(error));
-
-    return { message, code: errorObject?.code };
-}
-
-function getErrorMessage(
-    code: string | undefined,
-    fallbackMessage: string,
-): string {
-    if (code && ERROR_CODE_MESSAGES[code]) {
-        return ERROR_CODE_MESSAGES[code];
-    }
-    return `Failed to start scanner${
-        code ? ` (${code})` : ""
-    }: ${fallbackMessage}`;
 }
 
 const Scanner: React.FC = () => {
@@ -110,21 +64,17 @@ const Scanner: React.FC = () => {
     const [error, setError] = useState("");
     const [selectedCategoryId, setSelectedCategoryId] = useState<string>("");
 
+    // Use a ref to store the scanner instance so it persists between renders
+    const scannerRef = useRef<Html5Qrcode | null>(null);
+
+    // Cleanup the scanner when navigating away from the page
     useEffect(() => {
         return () => {
             document.body.classList.remove("scanner-active");
+            if (scannerRef.current?.isScanning) {
+                scannerRef.current.stop().catch(console.error);
+            }
         };
-    }, []);
-
-    const scanBarcodeOnWeb = useCallback(async () => {
-        const webScanner = new CapacitorBarcodeScannerWeb();
-        return webScanner.scanBarcode({
-            ...BARCODE_SCAN_OPTIONS,
-            web: {
-                showCameraSelection: false,
-                scannerFPS: 30,
-            },
-        });
     }, []);
 
     const fetchProductByBarcode = useCallback(async (barcode: string) => {
@@ -149,7 +99,6 @@ const Scanner: React.FC = () => {
 
             if (axios.isAxiosError(err) && err.response?.status === 404) {
                 setError("Product not found. Please enter details manually.");
-
                 setScannedProduct({ barcode, name: "", price: 0 });
                 setShowModal(true);
             } else {
@@ -160,54 +109,68 @@ const Scanner: React.FC = () => {
         }
     }, []);
 
-    const stopScan = useCallback(() => {
+    const stopScan = useCallback(async () => {
         setScanning(false);
         document.body.classList.remove("scanner-active");
+
+        // Stop the camera feed safely
+        if (scannerRef.current && scannerRef.current.isScanning) {
+            try {
+                await scannerRef.current.stop();
+                scannerRef.current.clear();
+            } catch (e) {
+                console.error("Error stopping scanner:", e);
+            }
+        }
     }, []);
 
-    const startScan = useCallback(async () => {
-        setScanning(true);
+    // Initialize the JS scanner when the 'scanning' state becomes true
+    useEffect(() => {
+        if (!scanning) return;
+
+        const startHtml5Qrcode = async () => {
+            try {
+                if (!scannerRef.current) {
+                    // This targets the div with id="reader" inside our render block
+                    scannerRef.current = new Html5Qrcode("reader");
+                }
+
+                await scannerRef.current.start(
+                    { facingMode: "environment" }, // Request rear camera
+                    {
+                        fps: 10, // Frames per second
+                        qrbox: { width: 250, height: 250 }, // Visual scanner box
+                    },
+
+                    async (decodedText) => {
+                        // On Success
+                        await stopScan();
+                        await fetchProductByBarcode(decodedText);
+                    },
+
+                    (errorMessage) => {
+                        // On Error: The library throws a warning every single frame it doesn't see a barcode.
+                        // We safely ignore this to prevent console spam.
+                    },
+                );
+            } catch (err) {
+                console.error("Failed to start scanner:", err);
+                setError(
+                    "Camera access denied or unavailable. Please ensure permissions are granted in your browser settings.",
+                );
+                setScanning(false);
+                document.body.classList.remove("scanner-active");
+            }
+        };
+
+        startHtml5Qrcode();
+    }, [scanning, fetchProductByBarcode, stopScan]);
+
+    const startScan = useCallback(() => {
         setError("");
         document.body.classList.add("scanner-active");
-
-        try {
-            const result = IS_WEB_PLATFORM
-                ? await scanBarcodeOnWeb()
-                : await CapacitorBarcodeScanner.scanBarcode(
-                      BARCODE_SCAN_OPTIONS,
-                  );
-
-            if (result.ScanResult) {
-                stopScan();
-                await fetchProductByBarcode(result.ScanResult);
-            }
-        } catch (err: unknown) {
-            console.error("Scan error:", err);
-
-            const { message, code } = parseScanError(err);
-            const shouldFallbackToWebScanner =
-                !IS_WEB_PLATFORM && /not implemented/i.test(message);
-
-            if (shouldFallbackToWebScanner) {
-                try {
-                    const fallbackResult = await scanBarcodeOnWeb();
-                    if (fallbackResult.ScanResult) {
-                        stopScan();
-                        await fetchProductByBarcode(fallbackResult.ScanResult);
-                    }
-                    return;
-                } catch (fallbackError) {
-                    console.error(
-                        "Web scanner fallback failed:",
-                        fallbackError,
-                    );
-                }
-            }
-
-            setError(getErrorMessage(code, message));
-            stopScan();
-        }
-    }, [fetchProductByBarcode, scanBarcodeOnWeb, stopScan]);
+        setScanning(true);
+    }, []);
 
     const updateScannedProductField = useCallback(
         <K extends keyof ScannedProduct>(
@@ -332,21 +295,33 @@ const Scanner: React.FC = () => {
                     </div>
                 )}
 
-                {scanning && (
-                    <div className='scanner-overlay'>
-                        <div className='scan-region'>
-                            <div className='scan-frame'></div>
-                            <p>Align barcode within frame</p>
-                        </div>
-                        <IonButton
-                            onClick={stopScan}
-                            color='light'
-                            className='cancel-scan'
-                        >
-                            Cancel
-                        </IonButton>
+                {/* Always render the container in the DOM, but hide it if not scanning to prevent React rendering conflicts with the JS library */}
+                <div
+                    style={{ display: scanning ? "block" : "none" }}
+                    className='scanner-overlay'
+                >
+                    <div
+                        className='scan-region'
+                        style={{
+                            width: "100%",
+                            maxWidth: "600px",
+                            margin: "0 auto",
+                            position: "relative",
+                        }}
+                    >
+                        {/* The HTML5 QR code library injects the video element directly into this div */}
+                        <div id='reader' style={{ width: "100%" }}></div>
+                        <div className='scan-frame'></div>
+                        <p>Align barcode within frame</p>
                     </div>
-                )}
+                    <IonButton
+                        onClick={stopScan}
+                        color='light'
+                        className='cancel-scan'
+                    >
+                        Cancel
+                    </IonButton>
+                </div>
 
                 <IonModal isOpen={showModal} onDidDismiss={resetModalState}>
                     <IonHeader>
@@ -387,7 +362,7 @@ const Scanner: React.FC = () => {
                                             </IonLabel>
                                             <IonInput
                                                 value={scannedProduct.barcode}
-                                                disabled={!IS_WEB_PLATFORM}
+                                                // We can now allow manual edits on all platforms natively
                                                 onIonInput={(e) =>
                                                     updateScannedProductField(
                                                         "barcode",
